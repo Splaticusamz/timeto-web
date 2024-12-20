@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import MainLayout from './components/layout/MainLayout';
 import { Login } from './pages/Login';
+import { OrganizationProfile } from './pages/organization/Profile';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import ErrorBoundary from './components/common/ErrorBoundary';
 
@@ -43,6 +44,13 @@ const AppRoutes = () => {
             <ProtectedRoute>
               <MainLayout>
                 <Settings />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/organization/profile" element={
+            <ProtectedRoute>
+              <MainLayout>
+                <OrganizationProfile />
               </MainLayout>
             </ProtectedRoute>
           } />
