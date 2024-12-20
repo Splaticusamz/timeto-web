@@ -1,5 +1,3 @@
-import { useState } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 interface HeaderProps {
@@ -7,9 +5,7 @@ interface HeaderProps {
   onLogout: () => void;
 }
 
-const Header = ({ onMenuClick, onLogout }: HeaderProps) => {
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const { currentUser } = useAuth();
+export const Header = ({ onMenuClick, onLogout }: HeaderProps) => {
   const { theme, toggleTheme } = useTheme();
 
   return (
@@ -24,12 +20,8 @@ const Header = ({ onMenuClick, onLogout }: HeaderProps) => {
           </svg>
         </button>
         <span className="text-xl font-semibold text-primary-600 dark:text-primary-400">TimeTo</span>
-        <select className="hidden md:block border dark:border-gray-700 rounded px-2 py-1 text-sm text-gray-600 dark:text-gray-300 bg-surface-light dark:bg-surface-dark">
-          <option>Organization 1</option>
-          <option>Organization 2</option>
-        </select>
       </div>
-      
+
       <div className="ml-auto flex items-center gap-2">
         <button
           onClick={toggleTheme}
@@ -51,32 +43,13 @@ const Header = ({ onMenuClick, onLogout }: HeaderProps) => {
           )}
         </button>
 
-        <div className="relative">
-          <button
-            onClick={() => setIsProfileOpen(!isProfileOpen)}
-            className="flex items-center"
-          >
-            <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
-              <span className="text-primary-700 dark:text-primary-300 font-medium">
-                {currentUser?.email?.[0]?.toUpperCase() || 'U'}
-              </span>
-            </div>
-          </button>
-          
-          {isProfileOpen && (
-            <div className="absolute right-0 top-full mt-1 w-48 bg-surface-light dark:bg-surface-dark border dark:border-gray-700 rounded shadow-lg">
-              <button
-                onClick={onLogout}
-                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                Sign out
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          onClick={onLogout}
+          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+        >
+          Sign Out
+        </button>
       </div>
     </header>
   );
-};
-
-export default Header; 
+}; 

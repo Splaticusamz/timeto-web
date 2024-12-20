@@ -1,21 +1,17 @@
-import { BrowserRouter as Router } from 'react-router-dom';
+import { RouterProvider } from 'react-router-dom';
+import { router } from './routes';
 import { AuthProvider } from './contexts/AuthContext';
-import { ThemeProvider } from './contexts/ThemeContext';
 import { OrganizationProvider } from './contexts/OrganizationContext';
-import AppRoutes from './routes';
+import { ThemeProvider } from './contexts/ThemeContext';
 
-const App = () => {
+export const App = () => {
   return (
-    <Router>
-      <AuthProvider>
-        <ThemeProvider>
-          <OrganizationProvider>
-            <AppRoutes />
-          </OrganizationProvider>
-        </ThemeProvider>
-      </AuthProvider>
-    </Router>
+    <AuthProvider>
+      <ThemeProvider>
+        <OrganizationProvider>
+          <RouterProvider router={router} />
+        </OrganizationProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 };
-
-export default App;

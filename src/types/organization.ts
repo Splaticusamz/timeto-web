@@ -1,3 +1,11 @@
+export type SystemRole = 'system_admin' | 'user';
+export type OrgMemberRole = 'owner' | 'admin' | 'member';
+
+export interface UserRoles {
+  systemRole: SystemRole;
+  organizations: Record<string, OrgMemberRole>; // orgId -> role mapping
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -6,21 +14,27 @@ export interface Organization {
   createdAt: Date;
   updatedAt: Date;
   ownerId: string;
-  members: {
-    [userId: string]: OrgMemberRole;
-  };
+  parentOrgId?: string; // For sub-organizations
+  members: Record<string, OrgMemberRole>;
   settings: {
     allowPublicEvents: boolean;
     requireMemberApproval: boolean;
     defaultEventVisibility: 'public' | 'organization' | 'private';
+    allowSubOrganizations: boolean; // Whether this org can have sub-orgs
+    maxSubOrganizations?: number; // Limit on number of sub-orgs
   };
 }
-
-export type OrgMemberRole = 'owner' | 'admin' | 'member';
 
 export interface CreateOrganizationData {
   name: string;
   description?: string;
   logo?: string;
-  settings?: Partial<Organization['settings']>;
+  parentOrgId?: string;
+  settings: {
+    allowPublicEvents: boolean;
+    requireMemberApproval: boolean;
+    defaultEventVisibility: 'public' | 'organization' | 'private';
+    allowSubOrganizations: boolean;
+    maxSubOrganizations?: number;
+  };
 } 

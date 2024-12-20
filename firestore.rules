@@ -1,0 +1,96 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSystemAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.systemRole == 'system_admin';
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasOrgRole(orgId, roles) {
+      return isAuthenticated() && 
+        (isSystemAdmin() || 
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         getUserData().organizations[orgId] in roles));
+    }
+
+    function isOrgOwner(orgId) {
+      return hasOrgRole(orgId, ['owner']);
+    }
+
+    function isOrgAdmin(orgId) {
+      return hasOrgRole(orgId, ['owner', 'admin']);
+    }
+
+    function isOrgMember(orgId) {
+      return hasOrgRole(orgId, ['owner', 'admin', 'member']);
+    }
+
+    function canManageSubOrgs(orgId) {
+      return isSystemAdmin() || (
+        isOrgAdmin(orgId) && 
+        get(/databases/$(database)/documents/organizations/$(orgId)).data.settings.allowSubOrganizations == true
+      );
+    }
+
+    // User profiles and roles
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isSystemAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if isSystemAdmin();
+    }
+
+    // Organizations
+    match /organizations/{orgId} {
+      // Read rules
+      allow read: if isAuthenticated() && (
+        isSystemAdmin() || 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) ||
+        (resource.data.settings.allowPublicEvents == true && request.method == 'get')
+      );
+
+      // Create rules
+      allow create: if isAuthenticated() && (
+        isSystemAdmin() || 
+        (
+          // Creating sub-organization
+          request.resource.data.parentOrgId != null && 
+          canManageSubOrgs(request.resource.data.parentOrgId)
+        ) || 
+        // Creating root organization (users can create their own orgs unless restricted)
+        (request.resource.data.parentOrgId == null && 
+         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         getUserData().systemRole == 'user')
+      );
+
+      // Update rules
+      allow update: if isAuthenticated() && (
+        isSystemAdmin() || 
+        isOrgAdmin(orgId)
+      );
+
+      // Delete rules
+      allow delete: if isAuthenticated() && (
+        isSystemAdmin() || 
+        isOrgOwner(orgId)
+      );
+
+      // Organization members
+      match /members/{memberId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isOrgAdmin(orgId);
+      }
+    }
+  }
+} 

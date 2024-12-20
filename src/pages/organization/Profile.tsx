@@ -2,143 +2,67 @@ import { useState } from 'react';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { CreateOrganizationForm } from '../../components/organization/CreateOrganizationForm';
 
-export const OrganizationProfile = () => {
-  const { currentOrganization, userOrganizations, loading, error } = useOrganization();
-  const [showCreateForm, setShowCreateForm] = useState(false);
+export const Profile = () => {
+  const { currentOrganization, loading, error } = useOrganization();
+  const [formError, setFormError] = useState<string | null>(null);
 
   if (loading) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-          <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-6">
-        <div className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 p-4 rounded">
-          {error}
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Error: </strong>
+          <span className="block sm:inline">{error}</span>
         </div>
       </div>
     );
   }
-
-  if (!currentOrganization && !showCreateForm) {
-    return (
-      <div className="p-6">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-            Welcome to TimeTo
-          </h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-8">
-            Create your first organization to get started
-          </p>
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md"
-          >
-            Create Organization
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (showCreateForm) {
-    return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-          Create New Organization
-        </h2>
-        <CreateOrganizationForm
-          onSuccess={() => setShowCreateForm(false)}
-          onCancel={() => setShowCreateForm(false)}
-        />
-      </div>
-    );
-  }
-
-  if (!currentOrganization) return null;
 
   return (
-    <div className="p-6">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Organization Profile
-          </h2>
-          {userOrganizations.length > 0 && (
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md"
-            >
-              Create New Organization
-            </button>
-          )}
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-          <div className="space-y-6">
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8">Organization Profile</h1>
+      
+      {currentOrganization ? (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h2 className="text-2xl font-semibold mb-4">{currentOrganization.name}</h2>
+          <div className="space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-                {currentOrganization.name}
-              </h3>
-              {currentOrganization.description && (
-                <p className="mt-1 text-gray-600 dark:text-gray-300">
-                  {currentOrganization.description}
-                </p>
-              )}
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">{currentOrganization.description || 'No description provided'}</p>
             </div>
-
             <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Settings</h4>
-              <dl className="mt-2 space-y-2">
-                <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600 dark:text-gray-400">Public Events</dt>
-                  <dd className="text-sm text-gray-900 dark:text-white">
-                    {currentOrganization.settings.allowPublicEvents ? 'Allowed' : 'Not Allowed'}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600 dark:text-gray-400">Member Approval</dt>
-                  <dd className="text-sm text-gray-900 dark:text-white">
-                    {currentOrganization.settings.requireMemberApproval ? 'Required' : 'Not Required'}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600 dark:text-gray-400">Default Event Visibility</dt>
-                  <dd className="text-sm text-gray-900 dark:text-white capitalize">
-                    {currentOrganization.settings.defaultEventVisibility}
-                  </dd>
-                </div>
-              </dl>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Owner</label>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">{currentOrganization.ownerId}</p>
             </div>
-
             <div>
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Organization Details</h4>
-              <dl className="mt-2 space-y-2">
-                <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600 dark:text-gray-400">Created</dt>
-                  <dd className="text-sm text-gray-900 dark:text-white">
-                    {currentOrganization.createdAt.toLocaleDateString()}
-                  </dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600 dark:text-gray-400">Last Updated</dt>
-                  <dd className="text-sm text-gray-900 dark:text-white">
-                    {currentOrganization.updatedAt.toLocaleDateString()}
-                  </dd>
-                </div>
-              </dl>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Created At</label>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">{currentOrganization.createdAt.toLocaleDateString()}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Last Updated</label>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">{currentOrganization.updatedAt.toLocaleDateString()}</p>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h2 className="text-2xl font-semibold mb-4">Create Organization</h2>
+          {formError && (
+            <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+              <strong className="font-bold">Error: </strong>
+              <span className="block sm:inline">{formError}</span>
+            </div>
+          )}
+          <CreateOrganizationForm onError={setFormError} />
+        </div>
+      )}
     </div>
   );
 }; 

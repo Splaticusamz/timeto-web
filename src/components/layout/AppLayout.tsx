@@ -1,14 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { Header } from './Header';
 
-interface MainLayoutProps {
-  children: React.ReactNode;
-}
-
-export const MainLayout = ({ children }: MainLayoutProps) => {
+export const AppLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const { signOut } = useAuth();
@@ -32,7 +28,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       <Sidebar isOpen={isSidebarOpen} />
       <main className="pt-14 md:ml-64">
         <div className="p-6">
-          {children}
+          <Outlet />
         </div>
       </main>
     </div>
