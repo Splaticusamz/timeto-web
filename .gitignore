@@ -6,9 +6,18 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-.history/
+firebase-debug.log*
+firestore-debug.log*
 
+# Dependencies
 node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+
+# Production
 dist
 dist-ssr
 *.local
@@ -23,15 +32,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.history
 
-# Environment variables
+# Environment files
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
 
-# Spec
-spec.txt    
+# Firebase
+.firebase/
+*.rules.dev
 
+# Temporary files
+
+layout-snapshot.md
+
+spec.txt
 #

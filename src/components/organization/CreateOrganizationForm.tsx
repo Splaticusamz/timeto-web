@@ -3,8 +3,7 @@ import { useOrganization } from '../../contexts/OrganizationContext';
 import { CreateOrganizationData } from '../../types/organization';
 
 interface CreateOrganizationFormProps {
-  onError: (error: string) => void;
-  parentOrgId?: string;
+  onError: (error: string | null) => void;
 }
 
 const defaultSettings = {
@@ -15,13 +14,12 @@ const defaultSettings = {
   maxSubOrganizations: 5,
 };
 
-export const CreateOrganizationForm = ({ onError, parentOrgId }: CreateOrganizationFormProps) => {
+export default function CreateOrganizationForm({ onError }: CreateOrganizationFormProps) {
   const { createOrganization } = useOrganization();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<CreateOrganizationData>({
     name: '',
     description: '',
-    parentOrgId,
     settings: defaultSettings,
   });
 
@@ -34,9 +32,11 @@ export const CreateOrganizationForm = ({ onError, parentOrgId }: CreateOrganizat
 
     try {
       setLoading(true);
+      onError(null);
       await createOrganization(formData);
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Failed to create organization');
+      console.error('Failed to create organization:', err);
+      onError('Failed to create organization. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -65,138 +65,157 @@ export const CreateOrganizationForm = ({ onError, parentOrgId }: CreateOrganizat
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Organization Name *
-        </label>
-        <input
-          type="text"
-          id="name"
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          required
-        />
-      </div>
-
-      <div>
-        <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Description
-        </label>
-        <textarea
-          id="description"
-          name="description"
-          value={formData.description}
-          onChange={handleChange}
-          rows={3}
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-        />
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium text-gray-900 dark:text-white">
+            Organization Name *
+          </label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            className="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 dark:bg-gray-800 sm:text-sm sm:leading-6"
+            required
+          />
+        </div>
+        <div>
+          <label htmlFor="description" className="block text-sm font-medium text-gray-900 dark:text-white">
+            Description
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            rows={3}
+            className="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-700 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-600 dark:bg-gray-800 sm:text-sm sm:leading-6"
+          />
+        </div>
       </div>
 
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">Organization Settings</h3>
+        <h3 className="text-sm font-medium text-gray-900 dark:text-white">Organization Settings</h3>
         
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="allowPublicEvents"
-            name="settings.allowPublicEvents"
-            checked={formData.settings.allowPublicEvents}
-            onChange={handleChange}
-            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-          />
-          <label htmlFor="allowPublicEvents" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-            Allow public events
-          </label>
-        </div>
+        <div className="space-y-3">
+          <div className="relative flex items-start">
+            <div className="flex h-6 items-center">
+              <input
+                type="checkbox"
+                id="allowPublicEvents"
+                name="settings.allowPublicEvents"
+                checked={formData.settings.allowPublicEvents}
+                onChange={handleChange}
+                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:border-gray-600 dark:bg-gray-800"
+              />
+            </div>
+            <div className="ml-3 text-sm leading-6">
+              <label htmlFor="allowPublicEvents" className="font-medium text-gray-900 dark:text-white">
+                Allow public events
+              </label>
+            </div>
+          </div>
 
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="requireMemberApproval"
-            name="settings.requireMemberApproval"
-            checked={formData.settings.requireMemberApproval}
-            onChange={handleChange}
-            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-          />
-          <label htmlFor="requireMemberApproval" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-            Require member approval
-          </label>
-        </div>
+          <div className="relative flex items-start">
+            <div className="flex h-6 items-center">
+              <input
+                type="checkbox"
+                id="requireMemberApproval"
+                name="settings.requireMemberApproval"
+                checked={formData.settings.requireMemberApproval}
+                onChange={handleChange}
+                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:border-gray-600 dark:bg-gray-800"
+              />
+            </div>
+            <div className="ml-3 text-sm leading-6">
+              <label htmlFor="requireMemberApproval" className="font-medium text-gray-900 dark:text-white">
+                Require member approval
+              </label>
+            </div>
+          </div>
 
-        <div>
-          <label htmlFor="defaultVisibility" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Default Event Visibility
-          </label>
-          <select
-            id="defaultVisibility"
-            name="settings.defaultEventVisibility"
-            value={formData.settings.defaultEventVisibility}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-          >
-            <option value="public">Public</option>
-            <option value="organization">Organization Only</option>
-            <option value="private">Private</option>
-          </select>
-        </div>
+          <div>
+            <label htmlFor="defaultVisibility" className="block text-sm font-medium text-gray-900 dark:text-white">
+              Default Event Visibility
+            </label>
+            <select
+              id="defaultVisibility"
+              name="settings.defaultEventVisibility"
+              value={formData.settings.defaultEventVisibility}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border-0 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-700 focus:ring-2 focus:ring-inset focus:ring-primary-600 dark:bg-gray-800 sm:text-sm sm:leading-6"
+            >
+              <option value="public">Public</option>
+              <option value="organization">Organization Only</option>
+              <option value="private">Private</option>
+            </select>
+          </div>
 
-        {!parentOrgId && (
-          <>
-            <div className="flex items-center">
+          <div className="relative flex items-start">
+            <div className="flex h-6 items-center">
               <input
                 type="checkbox"
                 id="allowSubOrganizations"
                 name="settings.allowSubOrganizations"
                 checked={formData.settings.allowSubOrganizations}
                 onChange={handleChange}
-                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-600 dark:border-gray-600 dark:bg-gray-800"
               />
-              <label htmlFor="allowSubOrganizations" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+            </div>
+            <div className="ml-3 text-sm leading-6">
+              <label htmlFor="allowSubOrganizations" className="font-medium text-gray-900 dark:text-white">
                 Allow sub-organizations
               </label>
             </div>
+          </div>
 
-            {formData.settings.allowSubOrganizations && (
-              <div>
-                <label htmlFor="maxSubOrganizations" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Maximum Sub-Organizations
-                </label>
-                <input
-                  type="number"
-                  id="maxSubOrganizations"
-                  name="settings.maxSubOrganizations"
-                  value={formData.settings.maxSubOrganizations}
-                  onChange={handleChange}
-                  min={1}
-                  max={100}
-                  className="mt-1 block w-32 rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                />
-              </div>
-            )}
-          </>
-        )}
+          {formData.settings.allowSubOrganizations && (
+            <div>
+              <label htmlFor="maxSubOrganizations" className="block text-sm font-medium text-gray-900 dark:text-white">
+                Maximum Sub-Organizations
+              </label>
+              <input
+                type="number"
+                id="maxSubOrganizations"
+                name="settings.maxSubOrganizations"
+                value={formData.settings.maxSubOrganizations}
+                onChange={handleChange}
+                min={1}
+                max={100}
+                className="mt-1 block w-32 rounded-md border-0 py-1.5 text-gray-900 dark:text-white shadow-sm ring-1 ring-inset ring-gray-300 dark:ring-gray-700 focus:ring-2 focus:ring-inset focus:ring-primary-600 dark:bg-gray-800 sm:text-sm sm:leading-6"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      <div>
+      <div className="mt-5 sm:mt-6 sm:grid sm:grid-flow-row-dense sm:grid-cols-2 sm:gap-3">
         <button
           type="submit"
           disabled={loading}
-          className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 ${
-            loading ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
+          className="inline-flex w-full justify-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 sm:col-start-2"
         >
           {loading ? (
             <>
-              <span className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></span>
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
               Creating...
             </>
           ) : (
             'Create Organization'
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => onError(null)}
+          className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:col-start-1 sm:mt-0"
+        >
+          Cancel
+        </button>
       </div>
     </form>
   );
-}; 
+} 

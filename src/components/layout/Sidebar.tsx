@@ -1,60 +1,190 @@
+import { Fragment } from 'react';
+import { Dialog, Transition } from '@headlessui/react';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import { NavLink } from 'react-router-dom';
+import { useOrganization } from '../../contexts/OrganizationContext';
+import { useAuth } from '../../contexts/AuthContext';
+
+const navigation = [
+  { name: 'Organizations', href: '/organizations' },
+  { name: 'Events', href: '/events' },
+  { name: 'Calendar', href: '/calendar' },
+];
 
 interface SidebarProps {
-  isOpen: boolean;
+  open: boolean;
+  setOpen: (open: boolean) => void;
 }
 
-export const Sidebar = ({ isOpen }: SidebarProps) => {
-  const navItems = [
-    { to: '/dashboard', label: 'Dashboard', icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-      </svg>
-    )},
-    { to: '/tasks', label: 'Tasks', icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-      </svg>
-    )},
-    { to: '/calendar', label: 'Calendar', icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    )},
-    { to: '/organization/profile', label: 'Organization', icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    )},
-    { to: '/settings', label: 'Settings', icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    )}
-  ];
+export function Sidebar({ open, setOpen }: SidebarProps) {
+  const { currentOrganization } = useOrganization();
+  const { currentUser } = useAuth();
 
   return (
-    <aside className={`fixed top-14 left-0 h-[calc(100vh-3.5rem)] w-64 bg-surface-light dark:bg-surface-dark border-r dark:border-gray-700 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-      <nav className="h-full py-4">
-        <ul className="space-y-2">
-          {navItems.map((item) => (
-            <li key={item.to}>
-              <NavLink
-                to={item.to}
-                className={({ isActive }) => `
-                  flex items-center gap-3 px-4 py-2 text-gray-600 dark:text-gray-300
-                  hover:bg-gray-50 dark:hover:bg-gray-800
-                  ${isActive ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20' : ''}
-                `}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </NavLink>
-            </li>
-          ))}
-        </ul>
-      </nav>
-    </aside>
+    <>
+      <Transition.Root show={open} as={Fragment}>
+        <Dialog as="div" className="relative z-50 lg:hidden" onClose={setOpen}>
+          <Transition.Child
+            as={Fragment}
+            enter="transition-opacity ease-linear duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="transition-opacity ease-linear duration-300"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-gray-900/80" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 flex">
+            <Transition.Child
+              as={Fragment}
+              enter="transition ease-in-out duration-300 transform"
+              enterFrom="-translate-x-full"
+              enterTo="translate-x-0"
+              leave="transition ease-in-out duration-300 transform"
+              leaveFrom="translate-x-0"
+              leaveTo="-translate-x-full"
+            >
+              <Dialog.Panel className="relative mr-16 flex w-full max-w-xs flex-1">
+                <Transition.Child
+                  as={Fragment}
+                  enter="ease-in-out duration-300"
+                  enterFrom="opacity-0"
+                  enterTo="opacity-100"
+                  leave="ease-in-out duration-300"
+                  leaveFrom="opacity-100"
+                  leaveTo="opacity-0"
+                >
+                  <div className="absolute left-full top-0 flex w-16 justify-center pt-5">
+                    <button type="button" className="-m-2.5 p-2.5" onClick={() => setOpen(false)}>
+                      <span className="sr-only">Close sidebar</span>
+                      <XMarkIcon className="h-6 w-6 text-white" aria-hidden="true" />
+                    </button>
+                  </div>
+                </Transition.Child>
+                {/* Sidebar component for mobile */}
+                <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-900 px-6 pb-4">
+                  <div className="flex h-16 shrink-0 items-center">
+                    <img
+                      className="h-8 w-auto"
+                      src="/logo.svg"
+                      alt="TimeTo"
+                    />
+                  </div>
+                  <nav className="flex flex-1 flex-col">
+                    <ul role="list" className="flex flex-1 flex-col gap-y-7">
+                      <li>
+                        <ul role="list" className="-mx-2 space-y-1">
+                          {navigation.map((item) => (
+                            <li key={item.name}>
+                              <NavLink
+                                to={item.href}
+                                className={({ isActive }) =>
+                                  `group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold ${
+                                    isActive
+                                      ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400'
+                                      : 'text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                  }`
+                                }
+                              >
+                                {item.name}
+                              </NavLink>
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                      {currentOrganization && (
+                        <li>
+                          <div className="text-xs font-semibold leading-6 text-gray-400">
+                            Current Organization
+                          </div>
+                          <ul role="list" className="-mx-2 mt-2 space-y-1">
+                            <li>
+                              <span
+                                className="text-gray-700 dark:text-gray-300 group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"
+                              >
+                                {currentOrganization.name}
+                              </span>
+                            </li>
+                          </ul>
+                        </li>
+                      )}
+                      <li className="mt-auto">
+                        <span
+                          className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300"
+                        >
+                          <span className="truncate">{currentUser?.email}</span>
+                        </span>
+                      </li>
+                    </ul>
+                  </nav>
+                </div>
+              </Dialog.Panel>
+            </Transition.Child>
+          </div>
+        </Dialog>
+      </Transition.Root>
+
+      {/* Static sidebar for desktop */}
+      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-6 pb-4">
+          <div className="flex h-16 shrink-0 items-center">
+            <img
+              className="h-8 w-auto"
+              src="/logo.svg"
+              alt="TimeTo"
+            />
+          </div>
+          <nav className="flex flex-1 flex-col">
+            <ul role="list" className="flex flex-1 flex-col gap-y-7">
+              <li>
+                <ul role="list" className="-mx-2 space-y-1">
+                  {navigation.map((item) => (
+                    <li key={item.name}>
+                      <NavLink
+                        to={item.href}
+                        className={({ isActive }) =>
+                          `group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold ${
+                            isActive
+                              ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400'
+                              : 'text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                          }`
+                        }
+                      >
+                        {item.name}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+              {currentOrganization && (
+                <li>
+                  <div className="text-xs font-semibold leading-6 text-gray-400">
+                    Current Organization
+                  </div>
+                  <ul role="list" className="-mx-2 mt-2 space-y-1">
+                    <li>
+                      <span
+                        className="text-gray-700 dark:text-gray-300 group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"
+                      >
+                        {currentOrganization.name}
+                      </span>
+                    </li>
+                  </ul>
+                </li>
+              )}
+              <li className="mt-auto">
+                <span
+                  className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300"
+                >
+                  <span className="truncate">{currentUser?.email}</span>
+                </span>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </div>
+    </>
   );
-}; 
+} 

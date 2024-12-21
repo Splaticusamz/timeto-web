@@ -1,17 +1,22 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, Timestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, Timestamp, deleteDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import { Organization, CreateOrganizationData, OrgMemberRole, UserRoles } from '../types/organization';
 
+interface OrganizationWithEventCount extends Organization {
+  eventCount: number;
+}
+
 interface OrganizationContextType {
-  currentOrganization: Organization | null;
-  userOrganizations: Organization[];
+  currentOrganization: OrganizationWithEventCount | null;
+  userOrganizations: OrganizationWithEventCount[];
   loading: boolean;
   error: string | null;
   userRoles: UserRoles | null;
-  createOrganization: (data: CreateOrganizationData) => Promise<Organization>;
+  createOrganization: (data: CreateOrganizationData) => Promise<OrganizationWithEventCount>;
   updateOrganization: (id: string, data: Partial<Organization>) => Promise<void>;
+  deleteOrganization: (id: string) => Promise<void>;
   switchOrganization: (id: string) => Promise<void>;
   getCurrentUserRole: () => OrgMemberRole | null;
   isSystemAdmin: () => boolean;
@@ -30,8 +35,8 @@ export const useOrganization = () => {
 };
 
 export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
-  const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null);
-  const [userOrganizations, setUserOrganizations] = useState<Organization[]>([]);
+  const [currentOrganization, setCurrentOrganization] = useState<OrganizationWithEventCount | null>(null);
+  const [userOrganizations, setUserOrganizations] = useState<OrganizationWithEventCount[]>([]);
   const [userRoles, setUserRoles] = useState<UserRoles | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +73,37 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     loadUserRoles();
   }, [currentUser]);
 
+  const loadEventCounts = async (organizations: Organization[]): Promise<OrganizationWithEventCount[]> => {
+    try {
+      const orgsWithCounts = await Promise.all(
+        organizations.map(async (org) => {
+          try {
+            const eventsQuery = query(
+              collection(db, 'events'),
+              where('organizationId', '==', org.id)
+            );
+            const eventsSnapshot = await getDocs(eventsQuery);
+            
+            return {
+              ...org,
+              eventCount: eventsSnapshot.size,
+            };
+          } catch (err) {
+            console.error(`Failed to load events for organization ${org.id}:`, err);
+            return {
+              ...org,
+              eventCount: 0,
+            };
+          }
+        })
+      );
+      return orgsWithCounts;
+    } catch (err) {
+      console.error('Failed to load event counts:', err);
+      return organizations.map(org => ({ ...org, eventCount: 0 }));
+    }
+  };
+
   // Load organizations
   useEffect(() => {
     if (!currentUser || !userRoles) {
@@ -82,18 +118,11 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         setError(null);
 
-        let orgsQuery;
-        if (userRoles.systemRole === 'system_admin') {
-          // System admins can see all organizations
-          orgsQuery = query(collection(db, 'organizations'));
-        } else {
-          // Regular users can only see organizations they're members of
-          orgsQuery = query(
-            collection(db, 'organizations'),
-            where(`members.${currentUser.uid}`, 'in', ['owner', 'admin', 'member'])
-          );
-        }
-
+        // Query organizations where the user is a member
+        const orgsQuery = query(
+          collection(db, 'organizations'),
+          where(`members.${currentUser.uid}`, '!=', null)
+        );
         const querySnapshot = await getDocs(orgsQuery);
         const orgs: Organization[] = [];
         querySnapshot.forEach((doc) => {
@@ -105,10 +134,12 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
             updatedAt: data.updatedAt?.toDate() || new Date(),
           } as Organization);
         });
-        setUserOrganizations(orgs);
+
+        const orgsWithCounts = await loadEventCounts(orgs);
+        setUserOrganizations(orgsWithCounts);
         
-        if (!currentOrganization && orgs.length > 0) {
-          setCurrentOrganization(orgs[0]);
+        if (!currentOrganization && orgsWithCounts.length > 0) {
+          setCurrentOrganization(orgsWithCounts[0]);
         }
       } catch (err) {
         console.error('Failed to load organizations:', err);
@@ -121,7 +152,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     loadUserOrganizations();
   }, [currentUser, userRoles]);
 
-  const createOrganization = async (data: CreateOrganizationData): Promise<Organization> => {
+  const createOrganization = async (data: CreateOrganizationData): Promise<OrganizationWithEventCount> => {
     if (!currentUser || !userRoles) throw new Error('User must be authenticated');
 
     // Check if user can create organization
@@ -153,7 +184,8 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         ...newOrg,
         createdAt: now.toDate(),
         updatedAt: now.toDate(),
-      } as Organization;
+        eventCount: 0,
+      } as OrganizationWithEventCount;
 
       // Update user roles
       const updatedRoles = {
@@ -208,13 +240,56 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const deleteOrganization = async (id: string) => {
+    if (!currentUser || !userRoles) throw new Error('User must be authenticated');
+    
+    // Check if user can delete organization
+    if (!isSystemAdmin() && (!userRoles.organizations[id] || !['owner'].includes(userRoles.organizations[id]))) {
+      throw new Error('You do not have permission to delete this organization');
+    }
+
+    try {
+      setError(null);
+      const orgRef = doc(db, 'organizations', id);
+      await deleteDoc(orgRef);
+
+      // Update user roles
+      if (userRoles.organizations[id]) {
+        const updatedRoles = {
+          ...userRoles,
+          organizations: { ...userRoles.organizations },
+        };
+        delete updatedRoles.organizations[id];
+        await updateDoc(doc(db, 'users', currentUser.uid), updatedRoles);
+        setUserRoles(updatedRoles);
+      }
+
+      // Update state
+      setUserOrganizations((prev) => prev.filter((org) => org.id !== id));
+      if (currentOrganization?.id === id) {
+        const remainingOrgs = userOrganizations.filter((org) => org.id !== id);
+        setCurrentOrganization(remainingOrgs.length > 0 ? remainingOrgs[0] : null);
+      }
+    } catch (err) {
+      console.error('Failed to delete organization:', err);
+      throw new Error('Failed to delete organization. Please try again.');
+    }
+  };
+
   const switchOrganization = async (id: string) => {
     if (!currentUser || !userRoles) throw new Error('User must be authenticated');
 
     try {
+      console.log('Switching to organization:', id);
+      console.log('Current user:', currentUser);
+      console.log('User roles:', userRoles);
+      
       setError(null);
       const org = userOrganizations.find((o) => o.id === id);
+      console.log('Found organization in userOrganizations:', org);
+      
       if (!org) {
+        console.log('Organization not found in userOrganizations, fetching from Firestore');
         const orgRef = doc(db, 'organizations', id);
         const orgDoc = await getDoc(orgRef);
         if (!orgDoc.exists()) throw new Error('Organization not found');
@@ -231,8 +306,10 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
           createdAt: data.createdAt?.toDate() || new Date(),
           updatedAt: data.updatedAt?.toDate() || new Date(),
         } as Organization;
+        console.log('Setting current organization from Firestore:', org);
         setCurrentOrganization(org);
       } else {
+        console.log('Setting current organization from userOrganizations:', org);
         setCurrentOrganization(org);
       }
     } catch (err) {
@@ -274,6 +351,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     userRoles,
     createOrganization,
     updateOrganization,
+    deleteOrganization,
     switchOrganization,
     getCurrentUserRole,
     isSystemAdmin,

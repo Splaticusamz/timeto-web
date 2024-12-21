@@ -1,50 +1,44 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
-import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
-import { Tasks } from './pages/Tasks';
-import { Calendar } from './pages/Calendar';
-import { Settings } from './pages/Settings';
-import { Profile } from './pages/organization/Profile';
-import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { AppLayout } from './components/layout/AppLayout';
+import { createBrowserRouter } from 'react-router-dom';
+import Layout from './components/layout/Layout';
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import Organizations from './pages/organization/Organizations';
+import Events from './pages/Events';
+import EventWizard from './components/event/EventWizard';
 
 export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Layout />,
+    children: [
+      {
+        path: '/',
+        element: <Organizations />,
+      },
+      {
+        path: '/organizations',
+        element: <Organizations />,
+      },
+      {
+        path: '/events',
+        element: <Events />,
+      },
+      {
+        path: '/events/new',
+        element: <EventWizard />,
+      },
+      {
+        path: '/events/:id/edit',
+        element: <EventWizard />,
+      },
+    ],
+  },
   {
     path: '/login',
     element: <Login />,
   },
   {
-    path: '/',
-    element: <ProtectedRoute><AppLayout /></ProtectedRoute>,
-    children: [
-      {
-        path: '/',
-        element: <Navigate to="/dashboard" replace />,
-      },
-      {
-        path: '/dashboard',
-        element: <Dashboard />,
-      },
-      {
-        path: '/tasks',
-        element: <Tasks />,
-      },
-      {
-        path: '/calendar',
-        element: <Calendar />,
-      },
-      {
-        path: '/settings',
-        element: <Settings />,
-      },
-      {
-        path: '/organization/profile',
-        element: <Profile />,
-      },
-      {
-        path: '*',
-        element: <Navigate to="/" replace />,
-      },
-    ],
+    path: '/register',
+    element: <Register />,
   },
 ]); 
