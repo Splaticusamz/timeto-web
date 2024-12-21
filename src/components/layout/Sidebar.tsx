@@ -4,6 +4,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation } from 'react-router-dom';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import logo from '../../assets/logo.svg';
+import { CalendarIcon } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
   show: boolean;
@@ -15,7 +16,6 @@ export function Sidebar({ show, onClose }: SidebarProps) {
   const { currentOrganization } = useOrganization();
 
   const navigation = [
-    { name: 'Calendar', href: '/calendar' },
     { name: 'Events', href: '/events' },
     { name: 'Organizations', href: '/organizations' },
   ];
@@ -109,6 +109,22 @@ export function Sidebar({ show, onClose }: SidebarProps) {
                                 {currentOrganization.name}
                               </Link>
                             </li>
+                            <li>
+                              <Link
+                                to="/calendar"
+                                className={`
+                                  group flex gap-x-3 rounded-md p-2 text-sm leading-6
+                                  ${
+                                    location.pathname === '/calendar'
+                                      ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400'
+                                      : 'text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                  }
+                                `}
+                              >
+                                <CalendarIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                                Calendar
+                              </Link>
+                            </li>
                           </ul>
                         </li>
                       )}
@@ -166,6 +182,22 @@ export function Sidebar({ show, onClose }: SidebarProps) {
                         `}
                       >
                         {currentOrganization.name}
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        to="/calendar"
+                        className={`
+                          group flex gap-x-3 rounded-md p-2 text-sm leading-6
+                          ${
+                            location.pathname === '/calendar'
+                              ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400'
+                              : 'text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                          }
+                        `}
+                      >
+                        <CalendarIcon className="h-6 w-6 shrink-0" aria-hidden="true" />
+                        Calendar
                       </Link>
                     </li>
                   </ul>
