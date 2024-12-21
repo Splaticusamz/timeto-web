@@ -13,6 +13,7 @@ interface EventContextType {
   updateEvent: (id: string, data: UpdateEventData) => Promise<Event>;
   deleteEvent: (id: string) => Promise<void>;
   loadEvents: () => Promise<void>;
+  saveDraft: (id: string, data: Partial<Event>) => Promise<void>;
 }
 
 const EventContext = createContext<EventContextType | undefined>(undefined);
@@ -86,8 +87,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
     const eventData: Event = {
       ...data,
       id: '', // Will be set by Firestore
-      createdAt: now,
-      updatedAt: now,
+      createdAt: new Date(now), 
+      updatedAt: new Date(now), 
       owner: currentUser.uid,
     };
 
@@ -124,12 +125,13 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       };
 
       await updateDoc(eventRef, updatedData);
-      
-      const updatedEvent = {
-        ...eventDoc.data(),
+      const eventData = eventDoc.data() as Event;
+      const updatedEvent: Event = {
+        ...eventData,
         ...updatedData,
         id,
-      } as Event;
+        updatedAt: new Date(updatedData.updatedAt), // Convert string to Date
+      };
 
       setEvents((prev) =>
         prev.map((event) => (event.id === id ? updatedEvent : event))
@@ -156,6 +158,24 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentUser]);
 
+  const saveDraft = useCallback(async (id: string, data: Partial<Event>): Promise<void> => {
+    if (!currentUser) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      const eventRef = doc(db, 'events', id);
+      await updateDoc(eventRef, {
+        ...data,
+        updatedAt: new Date().toISOString(),
+        status: 'draft'
+      });
+    } catch (err) {
+      console.error('Error saving draft:', err);
+      throw new Error('Failed to save draft');
+    }
+  }, [currentUser]);
+
   const value = {
     events,
     loading,
@@ -164,6 +184,7 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
     updateEvent,
     deleteEvent,
     loadEvents,
+    saveDraft,
   };
 
   return <EventContext.Provider value={value}>{children}</EventContext.Provider>;

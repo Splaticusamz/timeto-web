@@ -1,27 +1,19 @@
 import { useState } from 'react';
 import { useEvent } from '../../contexts/EventContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
-import { CreateEventData } from '../../types/event';
 
 interface CreateEventFormProps {
-  onClose: () => void;
-  onError: (error: string) => void;
+  onError: (error: string | null) => void;
+  onSuccess: () => void;
 }
 
-export default function CreateEventForm({ onClose, onError }: CreateEventFormProps) {
+export function CreateEventForm({ onError, onSuccess }: CreateEventFormProps) {
   const { createEvent } = useEvent();
   const { currentOrganization } = useOrganization();
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [startDate, setStartDate] = useState('');
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState<CreateEventData>({
-    title: '',
-    description: '',
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-    location: '',
-    organizationId: currentOrganization?.id || '',
-    status: 'draft',
-    visibility: 'private',
-  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,23 +24,27 @@ export default function CreateEventForm({ onClose, onError }: CreateEventFormPro
 
     setLoading(true);
     try {
-      await createEvent(formData);
-      onClose();
+      await createEvent({
+        title,
+        description,
+        startDate: new Date(startDate).toISOString(),
+        endDate: new Date(startDate).toISOString(), // For now, end date is same as start date
+        organizationId: currentOrganization.id,
+        status: 'scheduled',
+        visibility: 'public',
+      });
+      onSuccess();
+      onError(null);
     } catch (err) {
-      console.error('Error creating event:', err);
+      console.error('Failed to create event:', err);
       onError('Failed to create event. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
           Title
@@ -59,9 +55,9 @@ export default function CreateEventForm({ onClose, onError }: CreateEventFormPro
             name="title"
             id="title"
             required
-            value={formData.title}
-            onChange={handleChange}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm dark:bg-gray-700 dark:text-white"
           />
         </div>
       </div>
@@ -72,101 +68,50 @@ export default function CreateEventForm({ onClose, onError }: CreateEventFormPro
         </label>
         <div className="mt-1">
           <textarea
-            name="description"
             id="description"
+            name="description"
             rows={3}
-            value={formData.description}
-            onChange={handleChange}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm dark:bg-gray-700 dark:text-white"
           />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <div>
-          <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Start Date
-          </label>
-          <div className="mt-1">
-            <input
-              type="date"
-              name="startDate"
-              id="startDate"
-              required
-              value={formData.startDate}
-              onChange={handleChange}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            End Date
-          </label>
-          <div className="mt-1">
-            <input
-              type="date"
-              name="endDate"
-              id="endDate"
-              required
-              value={formData.endDate}
-              onChange={handleChange}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
-            />
-          </div>
-        </div>
-      </div>
-
       <div>
-        <label htmlFor="location" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-          Location
+        <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          Date
         </label>
         <div className="mt-1">
           <input
-            type="text"
-            name="location"
-            id="location"
-            value={formData.location}
-            onChange={handleChange}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label htmlFor="visibility" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-          Visibility
-        </label>
-        <div className="mt-1">
-          <select
-            name="visibility"
-            id="visibility"
+            type="datetime-local"
+            name="startDate"
+            id="startDate"
             required
-            value={formData.visibility}
-            onChange={handleChange}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white sm:text-sm"
-          >
-            <option value="private">Private</option>
-            <option value="public">Public</option>
-          </select>
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm dark:bg-gray-700 dark:text-white"
+          />
         </div>
       </div>
 
       <div className="flex justify-end space-x-3">
         <button
           type="button"
-          onClick={onClose}
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          onClick={() => {
+            onError(null);
+            onSuccess();
+          }}
+          className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex justify-center rounded-md border border-transparent bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50 dark:hover:bg-primary-500"
+          className="inline-flex items-center rounded-md border border-transparent bg-primary-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 disabled:opacity-50"
         >
-          {loading ? 'Creating...' : 'Create Event'}
+          {loading ? 'Creating...' : 'Create'}
         </button>
       </div>
     </form>

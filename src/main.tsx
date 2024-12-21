@@ -1,7 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
-import App from './App'
+import { RouterProvider } from 'react-router-dom'
+import { router } from './routes'
 import './index.css'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
@@ -10,16 +10,14 @@ import { EventProvider } from './contexts/EventContext'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <OrganizationProvider>
-            <EventProvider>
-              <App />
-            </EventProvider>
-          </OrganizationProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <AuthProvider>
+        <OrganizationProvider>
+          <EventProvider>
+            <RouterProvider router={router} />
+          </EventProvider>
+        </OrganizationProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </React.StrictMode>,
 )

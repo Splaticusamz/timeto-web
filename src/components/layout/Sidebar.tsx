@@ -1,29 +1,29 @@
 import { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { NavLink } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useOrganization } from '../../contexts/OrganizationContext';
-import { useAuth } from '../../contexts/AuthContext';
-
-const navigation = [
-  { name: 'Organizations', href: '/organizations' },
-  { name: 'Events', href: '/events' },
-  { name: 'Calendar', href: '/calendar' },
-];
+import logo from '../../assets/logo.svg';
 
 interface SidebarProps {
-  open: boolean;
-  setOpen: (open: boolean) => void;
+  show: boolean;
+  onClose: () => void;
 }
 
-export function Sidebar({ open, setOpen }: SidebarProps) {
+export function Sidebar({ show, onClose }: SidebarProps) {
+  const location = useLocation();
   const { currentOrganization } = useOrganization();
-  const { currentUser } = useAuth();
+
+  const navigation = [
+    { name: 'Calendar', href: '/calendar' },
+    { name: 'Events', href: '/events' },
+    { name: 'Organizations', href: '/organizations' },
+  ];
 
   return (
     <>
-      <Transition.Root show={open} as={Fragment}>
-        <Dialog as="div" className="relative z-50 lg:hidden" onClose={setOpen}>
+      <Transition.Root show={show} as={Fragment}>
+        <Dialog as="div" className="relative z-50 lg:hidden" onClose={onClose}>
           <Transition.Child
             as={Fragment}
             enter="transition-opacity ease-linear duration-300"
@@ -57,20 +57,15 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
                   leaveTo="opacity-0"
                 >
                   <div className="absolute left-full top-0 flex w-16 justify-center pt-5">
-                    <button type="button" className="-m-2.5 p-2.5" onClick={() => setOpen(false)}>
+                    <button type="button" className="-m-2.5 p-2.5" onClick={onClose}>
                       <span className="sr-only">Close sidebar</span>
                       <XMarkIcon className="h-6 w-6 text-white" aria-hidden="true" />
                     </button>
                   </div>
                 </Transition.Child>
-                {/* Sidebar component for mobile */}
                 <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-white dark:bg-gray-900 px-6 pb-4">
                   <div className="flex h-16 shrink-0 items-center">
-                    <img
-                      className="h-8 w-auto"
-                      src="/logo.svg"
-                      alt="TimeTo"
-                    />
+                    <img className="h-5" src={logo} alt="TimeTo" />
                   </div>
                   <nav className="flex flex-1 flex-col">
                     <ul role="list" className="flex flex-1 flex-col gap-y-7">
@@ -78,45 +73,45 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
                         <ul role="list" className="-mx-2 space-y-1">
                           {navigation.map((item) => (
                             <li key={item.name}>
-                              <NavLink
+                              <Link
                                 to={item.href}
-                                className={({ isActive }) =>
-                                  `group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold ${
-                                    isActive
+                                className={`
+                                  group flex gap-x-3 rounded-md p-2 text-sm leading-6
+                                  ${
+                                    location.pathname === item.href
                                       ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400'
                                       : 'text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                                  }`
-                                }
+                                  }
+                                `}
                               >
                                 {item.name}
-                              </NavLink>
+                              </Link>
                             </li>
                           ))}
                         </ul>
                       </li>
                       {currentOrganization && (
                         <li>
-                          <div className="text-xs font-semibold leading-6 text-gray-400">
-                            Current Organization
-                          </div>
+                          <div className="text-xs font-semibold leading-6 text-gray-400">Current organization</div>
                           <ul role="list" className="-mx-2 mt-2 space-y-1">
                             <li>
-                              <span
-                                className="text-gray-700 dark:text-gray-300 group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"
+                              <Link
+                                to="/events"
+                                className={`
+                                  group flex gap-x-3 rounded-md p-2 text-sm leading-6
+                                  ${
+                                    location.pathname === '/events'
+                                      ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400'
+                                      : 'text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                  }
+                                `}
                               >
                                 {currentOrganization.name}
-                              </span>
+                              </Link>
                             </li>
                           </ul>
                         </li>
                       )}
-                      <li className="mt-auto">
-                        <span
-                          className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300"
-                        >
-                          <span className="truncate">{currentUser?.email}</span>
-                        </span>
-                      </li>
                     </ul>
                   </nav>
                 </div>
@@ -126,15 +121,10 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
         </Dialog>
       </Transition.Root>
 
-      {/* Static sidebar for desktop */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
         <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-6 pb-4">
           <div className="flex h-16 shrink-0 items-center">
-            <img
-              className="h-8 w-auto"
-              src="/logo.svg"
-              alt="TimeTo"
-            />
+            <img className="h-5" src={logo} alt="TimeTo" />
           </div>
           <nav className="flex flex-1 flex-col">
             <ul role="list" className="flex flex-1 flex-col gap-y-7">
@@ -142,45 +132,45 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
                 <ul role="list" className="-mx-2 space-y-1">
                   {navigation.map((item) => (
                     <li key={item.name}>
-                      <NavLink
+                      <Link
                         to={item.href}
-                        className={({ isActive }) =>
-                          `group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold ${
-                            isActive
+                        className={`
+                          group flex gap-x-3 rounded-md p-2 text-sm leading-6
+                          ${
+                            location.pathname === item.href
                               ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400'
                               : 'text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-                          }`
-                        }
+                          }
+                        `}
                       >
                         {item.name}
-                      </NavLink>
+                      </Link>
                     </li>
                   ))}
                 </ul>
               </li>
               {currentOrganization && (
                 <li>
-                  <div className="text-xs font-semibold leading-6 text-gray-400">
-                    Current Organization
-                  </div>
+                  <div className="text-xs font-semibold leading-6 text-gray-400">Current organization</div>
                   <ul role="list" className="-mx-2 mt-2 space-y-1">
                     <li>
-                      <span
-                        className="text-gray-700 dark:text-gray-300 group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold"
+                      <Link
+                        to="/events"
+                        className={`
+                          group flex gap-x-3 rounded-md p-2 text-sm leading-6
+                          ${
+                            location.pathname === '/events'
+                              ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400'
+                              : 'text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                          }
+                        `}
                       >
                         {currentOrganization.name}
-                      </span>
+                      </Link>
                     </li>
                   </ul>
                 </li>
               )}
-              <li className="mt-auto">
-                <span
-                  className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm font-semibold leading-6 text-gray-700 dark:text-gray-300"
-                >
-                  <span className="truncate">{currentUser?.email}</span>
-                </span>
-              </li>
             </ul>
           </nav>
         </div>

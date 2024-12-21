@@ -104,7 +104,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Load organizations
+  // Load organizations and restore selected organization
   useEffect(() => {
     if (!currentUser || !userRoles) {
       setCurrentOrganization(null);
@@ -138,7 +138,24 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         const orgsWithCounts = await loadEventCounts(orgs);
         setUserOrganizations(orgsWithCounts);
         
-        if (!currentOrganization && orgsWithCounts.length > 0) {
+        // Try to restore the last selected organization from localStorage
+        const lastSelectedOrgId = localStorage.getItem(`lastOrg_${currentUser.uid}`);
+        const lastPath = localStorage.getItem(`lastPath_${currentUser.uid}`);
+        
+        if (lastSelectedOrgId) {
+          const lastOrg = orgsWithCounts.find(org => org.id === lastSelectedOrgId);
+          if (lastOrg) {
+            setCurrentOrganization(lastOrg);
+            // Navigate to the last path if we're at the root
+            if (lastPath && window.location.pathname === '/') {
+              window.location.href = lastPath;
+            }
+            return;
+          }
+        }
+        
+        // If no stored organization or it's not found, default to the first one
+        if (orgsWithCounts.length > 0) {
           setCurrentOrganization(orgsWithCounts[0]);
         }
       } catch (err) {
@@ -280,36 +297,34 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     if (!currentUser || !userRoles) throw new Error('User must be authenticated');
 
     try {
-      console.log('Switching to organization:', id);
-      console.log('Current user:', currentUser);
-      console.log('User roles:', userRoles);
-      
       setError(null);
       const org = userOrganizations.find((o) => o.id === id);
-      console.log('Found organization in userOrganizations:', org);
       
       if (!org) {
-        console.log('Organization not found in userOrganizations, fetching from Firestore');
         const orgRef = doc(db, 'organizations', id);
         const orgDoc = await getDoc(orgRef);
         if (!orgDoc.exists()) throw new Error('Organization not found');
 
-        // Check if user has access to this organization
         if (!isSystemAdmin() && !userRoles.organizations[id]) {
           throw new Error('You do not have access to this organization');
         }
 
         const data = orgDoc.data();
-        const org = {
+        const newOrg = {
           id: orgDoc.id,
           ...data,
           createdAt: data.createdAt?.toDate() || new Date(),
           updatedAt: data.updatedAt?.toDate() || new Date(),
-        } as Organization;
-        console.log('Setting current organization from Firestore:', org);
-        setCurrentOrganization(org);
+        } as OrganizationWithEventCount;
+        
+        // Store the selected organization ID in localStorage
+        localStorage.setItem(`lastOrg_${currentUser.uid}`, newOrg.id);
+        localStorage.setItem(`lastPath_${currentUser.uid}`, window.location.pathname);
+        setCurrentOrganization(newOrg);
       } else {
-        console.log('Setting current organization from userOrganizations:', org);
+        // Store the selected organization ID in localStorage
+        localStorage.setItem(`lastOrg_${currentUser.uid}`, org.id);
+        localStorage.setItem(`lastPath_${currentUser.uid}`, window.location.pathname);
         setCurrentOrganization(org);
       }
     } catch (err) {

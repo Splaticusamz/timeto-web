@@ -12,8 +12,14 @@
     "init-emulator": "tsx scripts/initEmulator.ts"
   },
   "dependencies": {
-    "@headlessui/react": "^1.7.17",
+    "@fullcalendar/core": "^6.1.15",
+    "@fullcalendar/daygrid": "^6.1.15",
+    "@fullcalendar/interaction": "^6.1.15",
+    "@fullcalendar/react": "^6.1.15",
+    "@fullcalendar/timegrid": "^6.1.15",
+    "@headlessui/react": "^1.7.19",
     "@heroicons/react": "^2.1.1",
+    "date-fns": "^4.1.0",
     "firebase": "^10.7.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
