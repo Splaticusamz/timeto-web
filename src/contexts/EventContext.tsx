@@ -42,14 +42,14 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       const publicEventsRef = collection(db, 'publicEvents');
 
       const [privateEvents, publicEvents] = await Promise.all([
-        // Private events query
+        // Private events query - match by owner
         getDocs(query(
           eventsRef,
-          where('owner', '==', currentUser.uid),
+          where('owner', '==', currentOrganization.id),
           orderBy('start', 'desc')
         )),
         
-        // Public events query
+        // Public events query - match by owner
         getDocs(query(
           publicEventsRef,
           where('owner', '==', currentOrganization.id),
@@ -57,58 +57,53 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
         ))
       ]);
 
-      console.log('Found private events:', privateEvents.size);
-      console.log('Found public events:', publicEvents.size);
+      console.log('Found private events:', {
+        size: privateEvents.size,
+        data: privateEvents.docs.map(doc => ({id: doc.id, ...doc.data()}))
+      });
+      console.log('Found public events:', {
+        size: publicEvents.size,
+        data: publicEvents.docs.map(doc => ({id: doc.id, ...doc.data()}))
+      });
 
       const loadedEvents: Event[] = [
-        ...privateEvents.docs.map(doc => {
-          const data = doc.data();
-          // First create a base event with all required fields
-          const event: Event = {
-            id: doc.id,
-            source: 'events' as EventSource,
-            title: data.title || '',
-            description: data.description || '',
-            timezone: data.timezone || 'UTC',
-            organizationId: data.organizationId || currentOrganization.id,
-            owner: data.owner || currentUser.uid,
-            status: data.status || 'draft',
-            visibility: data.visibility || 'organization',
-            location: data.location || { type: 'fixed' },
-            widgets: data.widgets || [],
-            start: data.start?._seconds ? new Date(data.start._seconds * 1000) : new Date(),
-            end: data.end?._seconds ? new Date(data.end._seconds * 1000) : new Date(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-          return event;
-        }),
-        ...publicEvents.docs.map(doc => {
-          const data = doc.data();
-          const event: Event = {
-            id: doc.id,
-            source: 'publicEvents' as EventSource,
-            title: data.title || '',
-            description: data.description || '',
-            timezone: data.timezone || 'UTC',
-            organizationId: data.organizationId || currentOrganization.id,
-            owner: data.owner || currentUser.uid,
-            status: data.status || 'draft',
-            visibility: data.visibility || 'organization',
-            location: data.location || { type: 'fixed' },
-            widgets: data.widgets || [],
-            start: data.start?._seconds ? new Date(data.start._seconds * 1000) : new Date(),
-            end: data.end?._seconds ? new Date(data.end._seconds * 1000) : new Date(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-          return event;
-        })
+        ...privateEvents.docs.map(doc => ({
+          id: doc.id,
+          source: 'events' as EventSource,
+          title: doc.data().title || '',
+          description: doc.data().description || '',
+          timezone: doc.data().timezone || 'UTC',
+          organizationId: doc.data().organizationId || currentOrganization.id,
+          owner: doc.data().owner || currentUser.uid,
+          status: doc.data().status || 'draft',
+          visibility: doc.data().visibility || 'organization',
+          location: doc.data().location || { type: 'fixed' },
+          widgets: doc.data().widgets || [],
+          start: doc.data().start?._seconds ? new Date(doc.data().start._seconds * 1000) : new Date(),
+          end: doc.data().end?._seconds ? new Date(doc.data().end._seconds * 1000) : new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })),
+        ...publicEvents.docs.map(doc => ({
+          id: doc.id,
+          source: 'publicEvents' as EventSource,
+          title: doc.data().title || '',
+          description: doc.data().description || '',
+          timezone: doc.data().timezone || 'UTC',
+          organizationId: doc.data().organizationId || currentOrganization.id,
+          owner: doc.data().owner || currentOrganization.id, // For public events, owner is the organization
+          status: doc.data().status || 'draft',
+          visibility: doc.data().visibility || 'organization',
+          location: doc.data().location || { type: 'fixed' },
+          widgets: doc.data().widgets || [],
+          start: doc.data().start?._seconds ? new Date(doc.data().start._seconds * 1000) : new Date(),
+          end: doc.data().end?._seconds ? new Date(doc.data().end._seconds * 1000) : new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }))
       ];
 
       console.log('Total events loaded:', loadedEvents.length);
-      console.log('Sample event data:', privateEvents.docs[0]?.data());
-      console.log('Converted event:', loadedEvents[0]);
       setEvents(loadedEvents);
     } catch (err) {
       console.error('Error loading events:', err);
