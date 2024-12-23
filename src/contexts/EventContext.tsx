@@ -63,31 +63,52 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       const loadedEvents: Event[] = [
         ...privateEvents.docs.map(doc => {
           const data = doc.data();
-          return {
+          // First create a base event with all required fields
+          const event: Event = {
             id: doc.id,
             source: 'events' as EventSource,
-            ...data,
-            start: data._seconds ? new Date(data._seconds * 1000) : new Date(),
-            end: data._seconds ? new Date(data._seconds * 1000) : new Date(),
+            title: data.title || '',
+            description: data.description || '',
+            timezone: data.timezone || 'UTC',
+            organizationId: data.organizationId || currentOrganization.id,
+            owner: data.owner || currentUser.uid,
+            status: data.status || 'draft',
+            visibility: data.visibility || 'organization',
+            location: data.location || { type: 'fixed' },
+            widgets: data.widgets || [],
+            start: data.start?._seconds ? new Date(data.start._seconds * 1000) : new Date(),
+            end: data.end?._seconds ? new Date(data.end._seconds * 1000) : new Date(),
             createdAt: new Date(),
             updatedAt: new Date(),
-          } as Event;
+          };
+          return event;
         }),
         ...publicEvents.docs.map(doc => {
           const data = doc.data();
-          return {
+          const event: Event = {
             id: doc.id,
             source: 'publicEvents' as EventSource,
-            ...data,
-            start: data._seconds ? new Date(data._seconds * 1000) : new Date(),
-            end: data._seconds ? new Date(data._seconds * 1000) : new Date(),
+            title: data.title || '',
+            description: data.description || '',
+            timezone: data.timezone || 'UTC',
+            organizationId: data.organizationId || currentOrganization.id,
+            owner: data.owner || currentUser.uid,
+            status: data.status || 'draft',
+            visibility: data.visibility || 'organization',
+            location: data.location || { type: 'fixed' },
+            widgets: data.widgets || [],
+            start: data.start?._seconds ? new Date(data.start._seconds * 1000) : new Date(),
+            end: data.end?._seconds ? new Date(data.end._seconds * 1000) : new Date(),
             createdAt: new Date(),
             updatedAt: new Date(),
-          } as Event;
+          };
+          return event;
         })
       ];
 
       console.log('Total events loaded:', loadedEvents.length);
+      console.log('Sample event data:', privateEvents.docs[0]?.data());
+      console.log('Converted event:', loadedEvents[0]);
       setEvents(loadedEvents);
     } catch (err) {
       console.error('Error loading events:', err);

@@ -100,9 +100,15 @@ export function Calendar() {
         events.map((event) => ({
           id: event.id,
           title: event.title,
-          start: event.startDate,
-          end: event.endDate,
+          start: event.start,
+          end: event.end,
           description: event.description,
+          extendedProps: {
+            widgets: event.widgets?.length || 0,
+            source: event.source,
+            location: event.location,
+            visibility: event.visibility
+          }
         }))
       );
     }
@@ -118,37 +124,35 @@ export function Calendar() {
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full">
       <div className="mb-4">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Calendar</h1>
       </div>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <div className="p-4">
-          <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay',
-            }}
-            events={calendarEvents}
-            height="auto"
-            editable={false}
-            selectable={true}
-            selectMirror={true}
-            dayMaxEvents={true}
-            weekends={true}
-            nowIndicator={true}
-            eventDisplay="block"
-            eventTimeFormat={{
-              hour: 'numeric',
-              minute: '2-digit',
-              meridiem: 'short',
-            }}
-            eventClick={handleEventClick}
-          />
-        </div>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex-grow">
+        <FullCalendar
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          headerToolbar={{
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+          }}
+          events={calendarEvents}
+          eventClick={handleEventClick}
+          height="auto"
+          editable={false}
+          selectable={true}
+          selectMirror={true}
+          dayMaxEvents={true}
+          weekends={true}
+          nowIndicator={true}
+          eventDisplay="block"
+          eventTimeFormat={{
+            hour: 'numeric',
+            minute: '2-digit',
+            meridiem: 'short'
+          }}
+        />
       </div>
       <EventDetailsModal
         event={selectedEvent}
