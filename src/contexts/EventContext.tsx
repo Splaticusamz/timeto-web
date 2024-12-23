@@ -3,7 +3,7 @@ import { collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, update
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import { useOrganization } from './OrganizationContext';
-import { Event, CreateEventData, UpdateEventData, EventStatus } from '../types/event';
+import { Event, CreateEventData, UpdateEventData, EventStatus, EventSource } from '../types/event';
 
 interface EventContextType {
   events: Event[];
@@ -26,16 +26,7 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const loadEvents = useCallback(async () => {
-    if (!currentUser) {
-      console.error('No user logged in');
-      setError('Please log in to view events.');
-      setEvents([]);
-      return;
-    }
-
-    if (!currentOrganization) {
-      console.error('No organization selected');
-      setError('Please select an organization to view events.');
+    if (!currentUser || !currentOrganization) {
       setEvents([]);
       return;
     }
@@ -45,26 +36,62 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
 
     try {
       console.log('Loading events for organization:', currentOrganization.id);
+      
+      // Load from both events and publicEvents collections
       const eventsRef = collection(db, 'events');
-      const q = query(
-        eventsRef,
-        where('organizationId', '==', currentOrganization.id),
-        orderBy('startDate', 'desc')
-      );
+      const publicEventsRef = collection(db, 'publicEvents');
 
-      const querySnapshot = await getDocs(q);
-      const loadedEvents: Event[] = [];
-      querySnapshot.forEach((doc) => {
-        loadedEvents.push({ id: doc.id, ...doc.data() } as Event);
-      });
+      const [privateEvents, publicEvents] = await Promise.all([
+        // Private events query
+        getDocs(query(
+          eventsRef,
+          where('owner', '==', currentUser.uid),
+          orderBy('start', 'desc')
+        )),
+        
+        // Public events query
+        getDocs(query(
+          publicEventsRef,
+          where('owner', '==', currentOrganization.id),
+          orderBy('start', 'desc')
+        ))
+      ]);
 
-      console.log('Loaded events:', loadedEvents);
+      console.log('Found private events:', privateEvents.size);
+      console.log('Found public events:', publicEvents.size);
+
+      const loadedEvents: Event[] = [
+        ...privateEvents.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            source: 'events' as EventSource,
+            ...data,
+            start: data._seconds ? new Date(data._seconds * 1000) : new Date(),
+            end: data._seconds ? new Date(data._seconds * 1000) : new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as Event;
+        }),
+        ...publicEvents.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            source: 'publicEvents' as EventSource,
+            ...data,
+            start: data._seconds ? new Date(data._seconds * 1000) : new Date(),
+            end: data._seconds ? new Date(data._seconds * 1000) : new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as Event;
+        })
+      ];
+
+      console.log('Total events loaded:', loadedEvents.length);
       setEvents(loadedEvents);
-      setError(null);
     } catch (err) {
       console.error('Error loading events:', err);
-      setError('Failed to load events. Please try again.');
-      setEvents([]);
+      setError('Failed to load events');
     } finally {
       setLoading(false);
     }
@@ -75,21 +102,24 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
   }, [loadEvents, currentOrganization?.id]);
 
   const createEvent = useCallback(async (data: CreateEventData): Promise<Event> => {
-    if (!currentUser) {
-      throw new Error('No user logged in');
-    }
-
-    if (!currentOrganization) {
-      throw new Error('No organization selected');
+    if (!currentUser || !currentOrganization) {
+      throw new Error('No user logged in or no organization selected');
     }
 
     const now = new Date().toISOString();
     const eventData: Event = {
       ...data,
       id: '', // Will be set by Firestore
-      createdAt: new Date(now), 
-      updatedAt: new Date(now), 
+      source: 'events' as EventSource,  // Add source
+      start: data.startDate,  // Map from old startDate to start
+      end: data.endDate,      // Map from old endDate to end
+      createdAt: new Date(now),
+      updatedAt: new Date(now),
       owner: currentUser.uid,
+      organizationId: currentOrganization.id,
+      status: data.status || 'draft',
+      visibility: data.visibility || 'organization',
+      widgets: data.widgets || [],
     };
 
     try {

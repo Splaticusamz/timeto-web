@@ -2,49 +2,14 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() {
+    // Helper functions
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(resource) {
-      return isAuthenticated() && resource.data.owner == request.auth.uid;
-    }
-
-    function hasRole(organizationId, role) {
-      return isAuthenticated() && 
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizations[organizationId].role == role;
-    }
-
-    match /users/{userId} {
-      allow read: if isAuthenticated() && request.auth.uid == userId;
-      allow write: if isAuthenticated() && request.auth.uid == userId;
-    }
-
-    match /organizations/{organizationId} {
-      allow read: if isAuthenticated() && (
-        hasRole(organizationId, 'owner') ||
-        hasRole(organizationId, 'admin') ||
-        hasRole(organizationId, 'member')
-      );
-      allow create: if isAuthenticated();
-      allow update, delete: if hasRole(organizationId, 'owner') || hasRole(organizationId, 'admin');
-    }
-
-    match /events/{eventId} {
-      allow read: if isAuthenticated() && (
-        hasRole(resource.data.organizationId, 'owner') ||
-        hasRole(resource.data.organizationId, 'admin') ||
-        hasRole(resource.data.organizationId, 'member')
-      );
-      allow create: if isAuthenticated() && (
-        hasRole(request.resource.data.organizationId, 'owner') ||
-        hasRole(request.resource.data.organizationId, 'admin')
-      );
-      allow update, delete: if isAuthenticated() && (
-        hasRole(resource.data.organizationId, 'owner') ||
-        hasRole(resource.data.organizationId, 'admin')
-      );
+    // Allow read and write access to all authenticated users
+    match /{document=**} {
+      allow read, write: if isSignedIn();
     }
   }
-} 
+}

@@ -118,20 +118,26 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         setError(null);
 
-        // Query organizations where the user is a member
-        const orgsQuery = query(
-          collection(db, 'organizations'),
-          where(`members.${currentUser.uid}`, '!=', null)
-        );
-        const querySnapshot = await getDocs(orgsQuery);
+        let querySnapshot;
+        if (userRoles?.systemRole === 'system_admin') {
+          // System admin sees all organizations
+          querySnapshot = await getDocs(collection(db, 'organizations'));
+        } else {
+          // Regular users only see their organizations
+          const orgsQuery = query(
+            collection(db, 'organizations'),
+            where(`members.${currentUser.uid}`, '!=', null)
+          );
+          querySnapshot = await getDocs(orgsQuery);
+        }
         const orgs: Organization[] = [];
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           orgs.push({
             id: doc.id,
             ...data,
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
+            createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
+            updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
           } as Organization);
         });
 

@@ -20,7 +20,8 @@
     "@headlessui/react": "^1.7.19",
     "@heroicons/react": "^2.1.1",
     "date-fns": "^4.1.0",
-    "firebase": "^10.7.1",
+    "firebase": "^10.14.1",
+    "firebase-admin": "^13.0.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.0"

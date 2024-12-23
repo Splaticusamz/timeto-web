@@ -3,11 +3,11 @@ import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
-// Use completely fake config in development to ensure we never touch production
+// Use completely fake config in development
 const firebaseConfig = import.meta.env.VITE_USE_EMULATOR === 'true' ? {
   apiKey: 'demo-key-123',
   authDomain: 'demo-project.firebaseapp.com',
-  projectId: 'demo-project',
+  projectId: 'timeto-69867',
 } : {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -20,35 +20,23 @@ const firebaseConfig = import.meta.env.VITE_USE_EMULATOR === 'true' ? {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-// Get Firebase services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-
-// Connect to emulators in development
 if (import.meta.env.VITE_USE_EMULATOR === 'true') {
-  console.log('🔧 Development mode detected, connecting to emulators...');
-  try {
-    connectFirestoreEmulator(db, 'localhost', 8082);
-    console.log('✅ Connected to Firestore emulator on port 8082');
-    connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-    console.log('✅ Connected to Auth emulator on port 9099');
-  } catch (err) {
-    console.error('❌ Failed to connect to emulators:', err);
-  }
-} else {
-  console.log('🚀 Production mode detected, using live Firebase services');
+  // Connect to emulators before any other Firestore operations
+  connectFirestoreEmulator(db, 'localhost', 8080);
+  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+  
+  // Enable persistence after emulator connection
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+    } else if (err.code === 'unimplemented') {
+      console.warn('The current browser does not support persistence.');
+    }
+  });
 }
 
-// Enable offline persistence after emulator connection
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn('Firebase persistence failed to enable (multiple tabs open)');
-  } else if (err.code === 'unimplemented') {
-    console.warn('Firebase persistence not supported in this browser');
-  }
-});
-
-export const storage = getStorage(app);
-
+export { auth, db };
 export default app; 

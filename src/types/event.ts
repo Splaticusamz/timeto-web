@@ -3,6 +3,7 @@ import { Timestamp } from 'firebase/firestore';
 export type EventVisibility = 'public' | 'organization' | 'invite-only';
 export type EventStatus = 'draft' | 'published' | 'cancelled';
 export type LocationType = 'fixed' | 'multiple' | 'virtual' | 'tbd';
+export type EventSource = 'events' | 'publicEvents';
 
 export interface EventLocation {
   type: LocationType;
@@ -29,10 +30,11 @@ export interface RecurrenceRule {
 
 export interface Event {
   id: string;
+  source: EventSource;
   title: string;
   description: string;
-  startDate: Date;
-  endDate?: Date;
+  start: Date;
+  end?: Date;
   timezone: string;
   createdAt: Date;
   updatedAt: Date;

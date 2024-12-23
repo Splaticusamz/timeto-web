@@ -48,4 +48,9 @@ dist-ssr
 layout-snapshot.md
 
 spec.txt
-#
+service-account-backup-NO-TOUCHING.json
+
+# Firebase emulator data
+local-backup/
+firestore-backup.json
+service-account*.json
