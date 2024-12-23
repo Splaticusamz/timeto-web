@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Event, Widget, LocationType } from '../../types/event';
+import { Event, Widget, LocationType, EventLocation } from '../../types/event';
 import { getWidgetDefinition } from './widgets/WidgetRegistry';
 import { 
   PhoneIcon, 
@@ -15,13 +15,324 @@ import {
   ChatBubbleBottomCenterTextIcon,
   InformationCircleIcon,
   QuestionMarkCircleIcon,
+  PencilIcon,
 } from '@heroicons/react/24/outline';
+import { useState } from 'react';
+import { useEvent } from '../../contexts/EventContext';
 
 interface EventPreviewProps {
   event: Event;
+  isEditMode?: boolean;
 }
 
-export function EventPreview({ event }: EventPreviewProps) {
+export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const { updateEvent } = useEvent();
+
+  const EditButton = ({ field }: { field: string }) => (
+    <button
+      onClick={() => setEditingField(field)}
+      className="ml-2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+    >
+      <PencilIcon className="h-4 w-4" />
+    </button>
+  );
+
+  const renderField = (field: string, value: string, label: string) => (
+    <div>
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
+        {label}
+        {isEditMode && editingField !== field && <EditButton field={field} />}
+      </dt>
+      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+        {editingField === field ? (
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => {
+                // Handle change
+              }}
+              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
+            />
+            <button
+              onClick={() => {
+                setEditingField(null);
+              }}
+              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          value
+        )}
+      </dd>
+    </div>
+  );
+
+  const renderTextField = (field: string, value: string, label: string) => (
+    <div>
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
+        {label}
+        {isEditMode && editingField !== field && <EditButton field={field} />}
+      </dt>
+      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+        {editingField === field ? (
+          <div className="flex items-center space-x-2">
+            {field === 'description' ? (
+              <textarea
+                value={value}
+                rows={4}
+                onChange={(e) => {
+                  // Handle change
+                }}
+                className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
+              />
+            ) : (
+              <input
+                type="text"
+                value={value}
+                onChange={(e) => {
+                  // Handle change
+                }}
+                className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
+              />
+            )}
+            <button
+              onClick={() => {
+                setEditingField(null);
+              }}
+              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <div className={field === 'description' ? 'whitespace-pre-wrap' : ''}>
+            {value}
+          </div>
+        )}
+      </dd>
+    </div>
+  );
+
+  const renderDateField = (field: string, value: Date, label: string) => (
+    <div>
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
+        {label}
+        {isEditMode && editingField !== field && <EditButton field={field} />}
+      </dt>
+      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+        {editingField === field ? (
+          <div className="flex items-center space-x-2">
+            <input
+              type="date"
+              value={value.toISOString().split('T')[0]}
+              onChange={(e) => {
+                // Handle change
+              }}
+              className="block rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
+            />
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          formatDateOnly(value)
+        )}
+      </dd>
+    </div>
+  );
+
+  const renderTimeField = (field: string, value: Date, label: string) => (
+    <div>
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
+        {label}
+        {isEditMode && editingField !== field && <EditButton field={field} />}
+      </dt>
+      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+        {editingField === field ? (
+          <div className="flex items-center space-x-2">
+            <input
+              type="time"
+              value={format(value, 'HH:mm')}
+              onChange={(e) => {
+                // Handle change
+              }}
+              className="block rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
+            />
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          formatTime(value)
+        )}
+      </dd>
+    </div>
+  );
+
+  const renderDropdownField = (
+    field: string, 
+    value: string, 
+    label: string, 
+    options: { label: string; value: string }[]
+  ) => (
+    <div>
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
+        {label}
+        {isEditMode && editingField !== field && <EditButton field={field} />}
+      </dt>
+      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+        {editingField === field ? (
+          <div className="flex items-center space-x-2">
+            <select
+              value={value}
+              onChange={(e) => {
+                // Handle change
+              }}
+              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
+            >
+              {options.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          options.find(o => o.value === value)?.label || value
+        )}
+      </dd>
+    </div>
+  );
+
+  const renderLocationField = (field: string, value: EventLocation, label: string) => (
+    <div>
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
+        {label}
+        {isEditMode && editingField !== field && <EditButton field={field} />}
+      </dt>
+      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+        {editingField === field ? (
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              value={value.address || ''}
+              onChange={(e) => {
+                // Handle change
+              }}
+              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
+            />
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          formatLocation()
+        )}
+      </dd>
+    </div>
+  );
+
+  const renderImageField = (field: string, value: string | undefined, label: string) => (
+    <div>
+      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 pb-2 border-b border-gray-200 dark:border-gray-700 mb-4">
+        {label}
+      </h3>
+      <dd className="mt-1">
+        {editingField === field ? (
+          <div className="flex items-center space-x-2">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                // Handle image upload
+              }}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+            />
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setEditingField(null)}
+              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          value && (
+            <div className={`relative overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 ${
+              field === 'coverImage' ? 'h-64 w-full' : 'h-32 w-32'
+            }`}>
+              <img
+                src={value}
+                alt={label}
+                className="h-full w-full object-cover"
+              />
+            </div>
+          )
+        )}
+      </dd>
+    </div>
+  );
+
   console.log('Full event data:', JSON.stringify(event, null, 2));
 
   console.log('Event data in preview:', {
@@ -142,150 +453,39 @@ export function EventPreview({ event }: EventPreviewProps) {
             Event Details
           </h3>
           <dl className="mt-4 space-y-4">
-            <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
-                {event.description}
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-                <CalendarIcon className="h-4 w-4 mr-1" />
-                Date
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-                {formatDateOnly(event.start)}
-                {event.end && event.start && 
-                 formatDateOnly(event.start) !== formatDateOnly(event.end) && (
-                  <>
-                    {' '}to{' '}
-                    {formatDateOnly(event.end)}
-                  </>
-                )}
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-                <ClockIcon className="h-4 w-4 mr-1" />
-                Time
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-                {formatTime(event.start)}
-                {event.end && (
-                  <>
-                    {' '}to{' '}
-                    {formatTime(event.end)}
-                  </>
-                )}
-                {' '}({event.timezone})
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-                <CalendarIcon className="h-4 w-4 mr-1" />
-                Recurrence
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-                {formatRecurrence()}
-              </dd>
-            </div>
-
-            <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-                <MapPinIcon className="h-4 w-4 mr-1" />
-                Location
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-                {formatLocation()}
-              </dd>
-            </div>
-
-            {/* Phone Number - moved here */}
-            {event.phoneNumber && (
-              <div>
-                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-                  <PhoneIcon className="h-4 w-4 mr-1" />
-                  Phone
-                </dt>
-                <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-                  <a 
-                    href={`tel:${event.phoneNumber}`}
-                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    {event.phoneNumber}
-                  </a>
-                </dd>
-              </div>
+            {renderTextField('title', event.title, 'Title')}
+            {renderTextField('description', event.description, 'Description')}
+            {renderDateField('date', event.start, 'Date')}
+            {renderTimeField('time', event.start, 'Time')}
+            {renderDropdownField('recurrence', 
+              event.recurrence?.frequency || 'none', 
+              'Recurrence',
+              [
+                { label: 'One-time event', value: 'none' },
+                { label: 'Daily', value: 'daily' },
+                { label: 'Weekly', value: 'weekly' },
+                { label: 'Monthly', value: 'monthly' }
+              ]
             )}
-
-            {/* Website - moved here */}
-            {event.website && (
-              <div>
-                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-                  <GlobeAltIcon className="h-4 w-4 mr-1" />
-                  Website
-                </dt>
-                <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-                  <a 
-                    href={event.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                  >
-                    {event.website}
-                  </a>
-                </dd>
-              </div>
+            {renderLocationField('location', event.location, 'Location')}
+            {event.phoneNumber && renderTextField('phoneNumber', event.phoneNumber, 'Phone')}
+            {event.website && renderTextField('website', event.website, 'Website')}
+            {renderDropdownField('visibility',
+              event.visibility,
+              'Visibility',
+              [
+                { label: 'Organization Members', value: 'organization' },
+                { label: 'Invite Only', value: 'invite-only' },
+                { label: 'Public', value: 'public' }
+              ]
             )}
-
-            <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-                <UserGroupIcon className="h-4 w-4 mr-1" />
-                Visibility
-              </dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-                {event.visibility === 'organization' ? 'Organization Members' : 'Invite Only'}
-              </dd>
-            </div>
           </dl>
         </div>
 
         {/* Right column - Images */}
         <div className="space-y-6">
-          {/* Event Image */}
-          {event.coverImage && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 pb-2 border-b border-gray-200 dark:border-gray-700 mb-4">
-                Event Image
-              </h3>
-              <div className="relative h-64 w-full overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-                <img 
-                  src={event.coverImage} 
-                  alt="Event cover"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Organization Logo */}
-          {event.logoImage && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 pb-2 border-b border-gray-200 dark:border-gray-700 mb-4">
-                Organization
-              </h3>
-              <div className="w-32 h-32 overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-                <img 
-                  src={event.logoImage} 
-                  alt="Event logo"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            </div>
-          )}
+          {renderImageField('coverImage', event.coverImage, 'Event Image')}
+          {renderImageField('logoImage', event.logoImage, 'Organization Logo')}
         </div>
       </div>
 

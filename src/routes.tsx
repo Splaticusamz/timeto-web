@@ -7,6 +7,7 @@ import { EventWizard } from './components/event/EventWizard';
 import { Login } from './pages/auth/Login';
 import { Register } from './pages/auth/Register';
 import { Calendar } from './pages/calendar/Calendar';
+import { EventDetails } from './pages/event/EventDetails';
 
 export const router = createBrowserRouter([
   {
@@ -43,11 +44,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'events/:id',
-        element: <EventWizard mode="view" />,
-      },
-      {
-        path: 'events/:id/edit',
-        element: <EventWizard mode="edit" />,
+        element: <EventDetails />,
       },
       {
         path: 'calendar',

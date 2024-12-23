@@ -78,25 +78,37 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
             isEnabled: true
           }));
 
+          const start = data.start?._seconds 
+            ? new Date(data.start._seconds * 1000) 
+            : data.start instanceof Date 
+              ? data.start 
+              : new Date(data.start);
+
+          const end = data.end?._seconds 
+            ? new Date(data.end._seconds * 1000) 
+            : data.end instanceof Date 
+              ? data.end 
+              : data.end ? new Date(data.end) : undefined;
+
           return {
             id: doc.id,
             source: 'events' as const,
-            title: data.title,
-            description: data.description,
-            start: data.start instanceof Date ? data.start : new Date(data.start),
-            end: data.end ? (data.end instanceof Date ? data.end : new Date(data.end)) : undefined,
-            timezone: data.timezone,
+            title: data.title || '',
+            description: data.description || '',
+            start: start,
+            end: end,
+            timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
             organizationId: data.organizationId,
             owner: data.owner,
-            status: data.status === 'cancelled' ? 'draft' : data.status,
-            visibility: data.visibility,
-            location: data.location,
+            status: data.status || 'draft',
+            visibility: data.visibility || 'organization',
+            location: data.location || { type: 'fixed' as const },
             widgets: widgetObjects,
+            createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+            updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
             photo: data.photo || data.photoUrl || data.image || data.imageUrl,
             phoneNumber: data.phoneNumber || data.phone || data.tel,
             website: data.website || data.url || data.webUrl,
-            createdAt: data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt),
-            updatedAt: data.updatedAt instanceof Date ? data.updatedAt : new Date(data.updatedAt),
           } as Event;
         }),
         ...publicEvents.docs.map(doc => {
@@ -120,7 +132,7 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
             timezone: data.timezone || 'UTC',
             organizationId: data.organizationId || currentOrganization.id,
             owner: data.owner || currentOrganization.id,
-            status: 'published' as const,
+            status: data.status || 'published',
             visibility: data.visibility || 'organization',
             location: data.location || { type: 'fixed' as const },
             widgets: widgetObjects,

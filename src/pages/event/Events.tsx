@@ -79,9 +79,17 @@ export function Events() {
                   }).toLowerCase()}
                 </td>
                 <td className="py-2 px-4">
-                  <span className="px-2 py-1 text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full">
-                    {event.status}
-                  </span>
+                  {event.status && (
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      event.status === 'published' 
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : event.status === 'draft'
+                          ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                    }`}>
+                      {event.status}
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
