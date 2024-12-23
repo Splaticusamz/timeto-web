@@ -53,7 +53,7 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
               onChange={(e) => {
                 // Handle change
               }}
-              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
+              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
             />
             <button
               onClick={() => {
