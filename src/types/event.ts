@@ -49,6 +49,8 @@ export interface Event {
   phoneNumber?: string;
   website?: string;
   coverPhoto?: string;
+  coverImage?: string;
+  logoImage?: string;
 }
 
 export interface CreateEventData {
@@ -64,6 +66,8 @@ export interface CreateEventData {
   organizationId: string;
   status: 'draft' | 'published';
   photo?: string;
+  phoneNumber?: string;
+  website?: string;
 }
 
 export interface UpdateEventData {
@@ -79,6 +83,8 @@ export interface UpdateEventData {
   recurrence?: RecurrenceRule;
   invitedUsers?: string[];
   photo?: string;
+  phoneNumber?: string;
+  website?: string;
 }
 
 export interface EventDraft {

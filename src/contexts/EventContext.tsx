@@ -69,12 +69,11 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       const loadedEvents: Event[] = [
         ...privateEvents.docs.map(doc => {
           const data = doc.data();
-          // Convert widget strings to Widget objects
           const widgetObjects = (data.widgets || []).map((widgetId: string) => ({
             id: widgetId,
             type: widgetId,
-            config: {},
-            data: {},
+            config: data.widgetConfigs?.[widgetId] || {},
+            data: data.widgetData?.[widgetId] || {},
             order: 0,
             isEnabled: true
           }));
@@ -94,13 +93,14 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
             location: data.location,
             widgets: widgetObjects,
             photo: data.photo || data.photoUrl || data.image || data.imageUrl,
+            phoneNumber: data.phoneNumber || data.phone || data.tel,
+            website: data.website || data.url || data.webUrl,
             createdAt: data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt),
             updatedAt: data.updatedAt instanceof Date ? data.updatedAt : new Date(data.updatedAt),
           } as Event;
         }),
         ...publicEvents.docs.map(doc => {
           const data = doc.data();
-          // Convert widget strings to Widget objects for public events too
           const widgetObjects = (data.widgets || []).map((widgetId: string) => ({
             id: widgetId,
             type: widgetId,
@@ -120,13 +120,17 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
             timezone: data.timezone || 'UTC',
             organizationId: data.organizationId || currentOrganization.id,
             owner: data.owner || currentOrganization.id,
-            status: 'published' as const,  // Public events are always published
+            status: 'published' as const,
             visibility: data.visibility || 'organization',
             location: data.location || { type: 'fixed' as const },
             widgets: widgetObjects,
             createdAt: new Date(),
             updatedAt: new Date(),
             photo: data.photo,
+            website: data.website,
+            phoneNumber: data.phoneNumber,
+            coverImage: data.coverImage,
+            logoImage: data.logoImage,
           } as Event;
         })
       ];
@@ -177,6 +181,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       organizationId: currentOrganization.id,
       status: data.status || 'draft',
       photo: data.photo,
+      phoneNumber: data.phoneNumber,
+      website: data.website,
     };
 
     try {
@@ -208,6 +214,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
 
       const updatedData = {
         ...data,
+        phoneNumber: data.phoneNumber,
+        website: data.website,
         updatedAt: new Date().toISOString(),
       };
 
