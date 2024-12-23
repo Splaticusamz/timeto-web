@@ -43,11 +43,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'events/:id',
-        element: <EventWizard />,
+        element: <EventWizard mode="view" />,
       },
       {
         path: 'events/:id/edit',
-        element: <EventWizard />,
+        element: <EventWizard mode="edit" />,
       },
       {
         path: 'calendar',

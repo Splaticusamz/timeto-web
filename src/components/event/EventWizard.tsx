@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useEvent } from '../../contexts/EventContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { Event, CreateEventData, EventVisibility, LocationType, Widget, EventLocation, RecurrenceRule } from '../../types/event';
@@ -7,12 +7,15 @@ import { BasicInfoForm } from './BasicInfoForm';
 import { WidgetSelector } from './widgets/WidgetSelector';
 import { WidgetConfigForm } from './WidgetConfigForm';
 import { EventPreview } from './EventPreview';
+import { PhotoUpload } from './PhotoUpload';
+import { WidgetConfig } from './WidgetConfig';
 
 type WizardStep = 'basic-info' | 'widgets' | 'publish';
 
 interface EventWizardProps {
   event?: Event;
   onSave?: (event: Event) => void;
+  mode?: 'view' | 'edit' | 'create';
 }
 
 interface BasicInfoFormData {
@@ -30,10 +33,11 @@ interface WidgetFormData {
   widgets: Widget[];
 }
 
-export function EventWizard({ event, onSave }: EventWizardProps) {
+export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps) {
   const navigate = useNavigate();
+  const { id } = useParams();
   const { currentOrganization } = useOrganization();
-  const { createEvent, updateEvent, saveDraft } = useEvent();
+  const { createEvent, updateEvent, saveDraft, events } = useEvent();
 
   const [currentStep, setCurrentStep] = useState<WizardStep>('basic-info');
   const [saving, setSaving] = useState(false);
@@ -43,8 +47,8 @@ export function EventWizard({ event, onSave }: EventWizardProps) {
   const [basicInfo, setBasicInfo] = useState<BasicInfoFormData>({
     title: event?.title || '',
     description: event?.description || '',
-    startDate: event?.startDate || new Date(),
-    endDate: event?.endDate,
+    startDate: event?.start || new Date(),
+    endDate: event?.end,
     timezone: event?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
     location: event?.location || {
       type: 'fixed' as LocationType,
@@ -127,10 +131,18 @@ export function EventWizard({ event, onSave }: EventWizardProps) {
       }
 
       const eventData: CreateEventData = {
-        ...basicInfo,
-        ...widgetConfig,
+        title: basicInfo.title,
+        description: basicInfo.description,
+        start: basicInfo.startDate,
+        end: basicInfo.endDate,
+        timezone: basicInfo.timezone,
+        location: basicInfo.location,
+        visibility: basicInfo.visibility,
+        recurrence: basicInfo.recurrence,
+        widgets: widgetConfig.widgets,
         organizationId: currentOrganization?.id || '',
         status: publish ? 'published' : 'draft',
+        photo: event?.photo,
       };
 
       let savedEvent: Event;
@@ -152,6 +164,75 @@ export function EventWizard({ event, onSave }: EventWizardProps) {
       setSaving(false);
     }
   };
+
+  // If we have an ID but no event prop, find it in the events
+  const currentEvent = event || (id ? events.find(e => e.id === id) : undefined);
+  
+  // If in view mode, show read-only version
+  if (mode === 'view' && currentEvent) {
+    // Debug the incoming dates
+    console.log('Original event dates:', {
+      start: currentEvent.start,
+      end: currentEvent.end,
+      startType: typeof currentEvent.start,
+      endType: typeof currentEvent.end
+    });
+
+    // Ensure dates are properly formatted and handle potential invalid dates
+    const formattedEvent = {
+      ...currentEvent,
+      start: (() => {
+        try {
+          const date = currentEvent.start instanceof Date 
+            ? currentEvent.start 
+            : new Date(currentEvent.start);
+          // Check if date is valid
+          return isNaN(date.getTime()) ? new Date() : date;
+        } catch (e) {
+          console.error('Error parsing start date:', e);
+          return new Date();
+        }
+      })(),
+      end: (() => {
+        if (!currentEvent.end) return undefined;
+        try {
+          const date = currentEvent.end instanceof Date 
+            ? currentEvent.end 
+            : new Date(currentEvent.end);
+          // Check if date is valid
+          return isNaN(date.getTime()) ? undefined : date;
+        } catch (e) {
+          console.error('Error parsing end date:', e);
+          return undefined;
+        }
+      })()
+    };
+
+    // Debug the formatted dates
+    console.log('Formatted event dates:', {
+      start: formattedEvent.start,
+      end: formattedEvent.end,
+      startType: typeof formattedEvent.start,
+      endType: typeof formattedEvent.end,
+      startIsValid: formattedEvent.start instanceof Date && !isNaN(formattedEvent.start.getTime()),
+      endIsValid: formattedEvent.end instanceof Date && !isNaN(formattedEvent.end?.getTime())
+    });
+
+    return (
+      <div className="max-w-6xl mx-auto py-8 px-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-semibold">{formattedEvent.title}</h1>
+          <button
+            onClick={() => navigate(`/events/${id}/edit`)}
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded hover:bg-blue-600"
+          >
+            Edit
+          </button>
+        </div>
+        <EventPreview event={formattedEvent} />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
@@ -202,6 +283,20 @@ export function EventWizard({ event, onSave }: EventWizardProps) {
               data={basicInfo}
               onChange={setBasicInfo}
             />
+            
+            <div className="mt-8">
+              <PhotoUpload 
+                photo={event?.photo}
+                onPhotoChange={(photo) => {
+                  if (event) {
+                    updateEvent(event.id, {
+                      ...event,
+                      photo,
+                    });
+                  }
+                }}
+              />
+            </div>
           </div>
         )}
 
@@ -217,7 +312,7 @@ export function EventWizard({ event, onSave }: EventWizardProps) {
               </div>
               <div className="lg:col-span-2">
                 <div className="space-y-8">
-                  {widgetConfig.widgets.map((widget) => (
+                  {widgetConfig.widgets.filter(w => w.isEnabled).map((widget) => (
                     <WidgetConfigForm
                       key={widget.id}
                       widget={widget}
@@ -244,8 +339,8 @@ export function EventWizard({ event, onSave }: EventWizardProps) {
                 id: event?.id || '',
                 title: basicInfo.title,
                 description: basicInfo.description,
-                startDate: basicInfo.startDate,
-                endDate: basicInfo.endDate,
+                start: basicInfo.startDate,
+                end: basicInfo.endDate,
                 timezone: basicInfo.timezone,
                 location: basicInfo.location,
                 visibility: basicInfo.visibility,
@@ -256,6 +351,8 @@ export function EventWizard({ event, onSave }: EventWizardProps) {
                 organizationId: currentOrganization?.id || '',
                 owner: event?.owner || '',
                 status: event?.status || 'draft',
+                source: event?.source || 'events',
+                photo: event?.photo,
               }}
             />
           </div>

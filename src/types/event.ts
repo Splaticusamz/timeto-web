@@ -30,41 +30,40 @@ export interface RecurrenceRule {
 
 export interface Event {
   id: string;
-  source: EventSource;
   title: string;
   description: string;
   start: Date;
   end?: Date;
   timezone: string;
+  location: EventLocation;
+  visibility: EventVisibility;
+  recurrence?: RecurrenceRule;
+  widgets: Widget[];
   createdAt: Date;
   updatedAt: Date;
   organizationId: string;
-  subOrganizationId?: string;
   owner: string;
-  status: EventStatus;
-  visibility: EventVisibility;
-  location: EventLocation;
-  widgets: Widget[];
-  recurrence?: RecurrenceRule;
-  invitedUsers?: string[];
-  attendees?: string[];
-  deepLink?: string;
+  status: 'draft' | 'published';
+  source: 'events' | 'publicEvents';
+  photo?: string;
+  phoneNumber?: string;
+  website?: string;
+  coverPhoto?: string;
 }
 
 export interface CreateEventData {
   title: string;
   description: string;
-  startDate: Date;
-  endDate?: Date;
+  start: Date;
+  end?: Date;
   timezone: string;
   location: EventLocation;
-  organizationId: string;
-  subOrganizationId?: string;
-  status: EventStatus;
   visibility: EventVisibility;
-  widgets: Widget[];
   recurrence?: RecurrenceRule;
-  invitedUsers?: string[];
+  widgets: Widget[];
+  organizationId: string;
+  status: 'draft' | 'published';
+  photo?: string;
 }
 
 export interface UpdateEventData {
@@ -74,11 +73,12 @@ export interface UpdateEventData {
   endDate?: Date;
   timezone?: string;
   location?: EventLocation;
-  status?: EventStatus;
+  status?: 'draft' | 'published';
   visibility?: EventVisibility;
   widgets?: Widget[];
   recurrence?: RecurrenceRule;
   invitedUsers?: string[];
+  photo?: string;
 }
 
 export interface EventDraft {

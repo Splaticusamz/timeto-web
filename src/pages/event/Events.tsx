@@ -53,7 +53,12 @@ export function Events() {
             {events.map((event) => (
               <tr 
                 key={event.id}
-                onClick={() => navigate(`/events/${event.id}`)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  const path = `/events/${event.id}`;
+                  console.log('Navigating to:', path);
+                  navigate(path, { replace: true });
+                }}
                 className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-b-0"
               >
                 <td className="py-2 text-sm px-4 text-gray-900 dark:text-white">

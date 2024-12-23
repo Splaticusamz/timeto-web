@@ -67,40 +67,68 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       });
 
       const loadedEvents: Event[] = [
-        ...privateEvents.docs.map(doc => ({
-          id: doc.id,
-          source: 'events' as EventSource,
-          title: doc.data().title || '',
-          description: doc.data().description || '',
-          timezone: doc.data().timezone || 'UTC',
-          organizationId: doc.data().organizationId || currentOrganization.id,
-          owner: doc.data().owner || currentUser.uid,
-          status: 'published' as EventStatus,
-          visibility: doc.data().visibility || 'organization',
-          location: doc.data().location || { type: 'fixed' },
-          widgets: doc.data().widgets || [],
-          start: doc.data().start?._seconds ? new Date(doc.data().start._seconds * 1000) : new Date(),
-          end: doc.data().end?._seconds ? new Date(doc.data().end._seconds * 1000) : new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })),
-        ...publicEvents.docs.map(doc => ({
-          id: doc.id,
-          source: 'publicEvents' as EventSource,
-          title: doc.data().title || '',
-          description: doc.data().description || '',
-          timezone: doc.data().timezone || 'UTC',
-          organizationId: doc.data().organizationId || currentOrganization.id,
-          owner: doc.data().owner || currentOrganization.id,
-          status: 'published' as EventStatus,
-          visibility: doc.data().visibility || 'organization',
-          location: doc.data().location || { type: 'fixed' },
-          widgets: doc.data().widgets || [],
-          start: doc.data().start?._seconds ? new Date(doc.data().start._seconds * 1000) : new Date(),
-          end: doc.data().end?._seconds ? new Date(doc.data().end._seconds * 1000) : new Date(),
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }))
+        ...privateEvents.docs.map(doc => {
+          const data = doc.data();
+          // Convert widget strings to Widget objects
+          const widgetObjects = (data.widgets || []).map((widgetId: string) => ({
+            id: widgetId,
+            type: widgetId,
+            config: {},
+            data: {},
+            order: 0,
+            isEnabled: true
+          }));
+
+          return {
+            id: doc.id,
+            source: 'events' as const,
+            title: data.title,
+            description: data.description,
+            start: data.start instanceof Date ? data.start : new Date(data.start),
+            end: data.end ? (data.end instanceof Date ? data.end : new Date(data.end)) : undefined,
+            timezone: data.timezone,
+            organizationId: data.organizationId,
+            owner: data.owner,
+            status: data.status === 'cancelled' ? 'draft' : data.status,
+            visibility: data.visibility,
+            location: data.location,
+            widgets: widgetObjects,
+            photo: data.photo || data.photoUrl || data.image || data.imageUrl,
+            createdAt: data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt),
+            updatedAt: data.updatedAt instanceof Date ? data.updatedAt : new Date(data.updatedAt),
+          } as Event;
+        }),
+        ...publicEvents.docs.map(doc => {
+          const data = doc.data();
+          // Convert widget strings to Widget objects for public events too
+          const widgetObjects = (data.widgets || []).map((widgetId: string) => ({
+            id: widgetId,
+            type: widgetId,
+            config: {},
+            data: {},
+            order: 0,
+            isEnabled: true
+          }));
+
+          return {
+            id: doc.id,
+            source: 'publicEvents' as const,
+            title: data.title || '',
+            description: data.description || '',
+            start: data.start?._seconds ? new Date(data.start._seconds * 1000) : new Date(),
+            end: data.end?._seconds ? new Date(data.end._seconds * 1000) : undefined,
+            timezone: data.timezone || 'UTC',
+            organizationId: data.organizationId || currentOrganization.id,
+            owner: data.owner || currentOrganization.id,
+            status: 'published' as const,  // Public events are always published
+            visibility: data.visibility || 'organization',
+            location: data.location || { type: 'fixed' as const },
+            widgets: widgetObjects,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            photo: data.photo,
+          } as Event;
+        })
       ];
 
       console.log('Total events loaded:', loadedEvents.length);
@@ -133,18 +161,22 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
 
     const now = new Date().toISOString();
     const eventData: Event = {
-      ...data,
       id: '', // Will be set by Firestore
-      source: 'events' as EventSource,  // Add source
-      start: data.startDate,  // Map from old startDate to start
-      end: data.endDate,      // Map from old endDate to end
+      source: 'events' as const,
+      title: data.title,
+      description: data.description,
+      start: data.start,
+      end: data.end,
+      timezone: data.timezone,
+      location: data.location,
+      visibility: data.visibility,
+      widgets: data.widgets || [],
       createdAt: new Date(now),
       updatedAt: new Date(now),
       owner: currentUser.uid,
       organizationId: currentOrganization.id,
       status: data.status || 'draft',
-      visibility: data.visibility || 'organization',
-      widgets: data.widgets || [],
+      photo: data.photo,
     };
 
     try {
