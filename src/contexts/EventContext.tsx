@@ -75,7 +75,7 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
           timezone: doc.data().timezone || 'UTC',
           organizationId: doc.data().organizationId || currentOrganization.id,
           owner: doc.data().owner || currentUser.uid,
-          status: doc.data().status || 'draft',
+          status: 'published' as EventStatus,
           visibility: doc.data().visibility || 'organization',
           location: doc.data().location || { type: 'fixed' },
           widgets: doc.data().widgets || [],
@@ -91,8 +91,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
           description: doc.data().description || '',
           timezone: doc.data().timezone || 'UTC',
           organizationId: doc.data().organizationId || currentOrganization.id,
-          owner: doc.data().owner || currentOrganization.id, // For public events, owner is the organization
-          status: doc.data().status || 'draft',
+          owner: doc.data().owner || currentOrganization.id,
+          status: 'published' as EventStatus,
           visibility: doc.data().visibility || 'organization',
           location: doc.data().location || { type: 'fixed' },
           widgets: doc.data().widgets || [],
@@ -104,6 +104,15 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       ];
 
       console.log('Total events loaded:', loadedEvents.length);
+      console.log('Private events statuses:', privateEvents.docs.map(doc => ({
+        id: doc.id,
+        status: doc.data().status
+      })));
+      console.log('Public events statuses:', publicEvents.docs.map(doc => ({
+        id: doc.id,
+        status: doc.data().status
+      })));
+
       setEvents(loadedEvents);
     } catch (err) {
       console.error('Error loading events:', err);
