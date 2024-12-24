@@ -355,6 +355,8 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
                 status: event?.status || 'draft',
                 source: event?.source || 'events',
                 photo: event?.photo,
+                coverImage: event?.coverImage,
+                logoImage: event?.logoImage,
               }}
             />
           </div>

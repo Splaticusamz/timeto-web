@@ -19,6 +19,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { useEvent } from '../../contexts/EventContext';
+import { EventMembers } from './EventMembers';
 
 interface EventPreviewProps {
   event: Event;
@@ -317,7 +318,7 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
             </button>
           </div>
         ) : (
-          value && (
+          value ? (
             <div className={`relative overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 ${
               field === 'coverImage' ? 'h-64 w-full' : 'h-32 w-32'
             }`}>
@@ -326,8 +327,23 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
                 alt={label}
                 className="h-full w-full object-cover"
               />
+              {isEditMode && (
+                <button
+                  onClick={() => setEditingField(field)}
+                  className="absolute top-2 right-2 p-1 bg-white dark:bg-gray-800 rounded-full shadow hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <PencilIcon className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+                </button>
+              )}
             </div>
-          )
+          ) : isEditMode ? (
+            <button
+              onClick={() => setEditingField(field)}
+              className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-gray-400 dark:hover:border-gray-500"
+            >
+              <PhotoIcon className="h-8 w-8 text-gray-400" />
+            </button>
+          ) : null
         )}
       </dd>
     </div>
@@ -339,6 +355,13 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
     photo: event.photo,
     widgets: event.widgets,
     fullEvent: event
+  });
+
+  console.log('Event image data:', {
+    coverImage: event.coverImage,
+    logoImage: event.logoImage,
+    photo: event.photo,
+    coverPhoto: event.coverPhoto
   });
 
   const formatLocation = () => {
@@ -443,6 +466,19 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
     'call',
   ];
 
+  const getWidgetStatus = (widgetType: Widget['type']) => {
+    // First check if the widget exists in event.widgets
+    const widget = event.widgets.find(w => w.type === widgetType);
+    
+    // If widget exists, use its enabled status
+    if (widget) {
+      return widget.isEnabled;
+    }
+    
+    // If widget doesn't exist, it should be considered disabled
+    return false;
+  };
+
   return (
     <div className="space-y-6">
       {/* Two-column layout */}
@@ -494,8 +530,7 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
         <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Widgets</h3>
         <div className="mt-4 grid grid-cols-2 gap-4">
           {availableWidgets.map(widgetType => {
-            const widget = event.widgets.find(w => w.type === widgetType);
-            const isEnabled = widget?.isEnabled ?? false;
+            const isEnabled = getWidgetStatus(widgetType);
             
             return (
               <div 
@@ -520,6 +555,11 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
             );
           })}
         </div>
+      </div>
+
+      {/* Members Section */}
+      <div className="border-t pt-6">
+        <EventMembers eventId={event.id} />
       </div>
     </div>
   );

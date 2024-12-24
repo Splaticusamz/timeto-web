@@ -109,6 +109,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
             photo: data.photo || data.photoUrl || data.image || data.imageUrl,
             phoneNumber: data.phoneNumber || data.phone || data.tel,
             website: data.website || data.url || data.webUrl,
+            coverImage: data.coverImage || data.coverPhoto || data.cover,
+            logoImage: data.logoImage || data.logo,
           } as Event;
         }),
         ...publicEvents.docs.map(doc => {
@@ -195,6 +197,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       photo: data.photo,
       phoneNumber: data.phoneNumber,
       website: data.website,
+      coverImage: data.coverImage,
+      logoImage: data.logoImage,
     };
 
     try {

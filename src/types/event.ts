@@ -68,6 +68,8 @@ export interface CreateEventData {
   photo?: string;
   phoneNumber?: string;
   website?: string;
+  coverImage?: string;
+  logoImage?: string;
 }
 
 export interface UpdateEventData {
@@ -85,6 +87,8 @@ export interface UpdateEventData {
   photo?: string;
   phoneNumber?: string;
   website?: string;
+  coverImage?: string;
+  logoImage?: string;
 }
 
 export interface EventDraft {

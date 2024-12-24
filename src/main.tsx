@@ -7,6 +7,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { OrganizationProvider } from './contexts/OrganizationContext'
 import { EventProvider } from './contexts/EventContext'
+import { MemberProvider } from './contexts/MemberContext'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -14,7 +15,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <OrganizationProvider>
           <EventProvider>
-            <RouterProvider router={router} />
+            <MemberProvider>
+              <RouterProvider router={router} />
+            </MemberProvider>
           </EventProvider>
         </OrganizationProvider>
       </AuthProvider>

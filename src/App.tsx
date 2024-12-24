@@ -2,6 +2,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './contexts/AuthContext';
 import { Layout } from './components/layout/Layout';
 import { EventDetails } from './pages/event/EventDetails';
+import { MemberProvider } from './contexts/MemberContext';
 
 export default function App() {
   const { currentUser } = useAuth();
@@ -11,8 +12,10 @@ export default function App() {
   }
 
   return (
-    <Layout>
-      <Outlet />
-    </Layout>
+    <MemberProvider>
+      <Layout>
+        <Outlet />
+      </Layout>
+    </MemberProvider>
   );
 }
