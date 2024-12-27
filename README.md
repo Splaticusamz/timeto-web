@@ -8,8 +8,9 @@ A web application for managing events and organizations, built with React, Fireb
 - npm v9 or higher
 - Firebase CLI (`npm install -g firebase-tools`)
 - Firebase project (create one at https://console.firebase.google.com)
+- Git
 
-## Setup
+## Setup (Cross-Platform)
 
 1. Clone and install dependencies:
    ```bash
@@ -79,24 +80,50 @@ A web application for managing events and organizations, built with React, Fireb
 
 3. Firebase Setup:
    ```bash
-   # Login to Firebase
+   # Login to Firebase (will open browser)
    firebase login
 
    # Initialize Firebase project
    firebase init
-   # Select: Firestore, Hosting, Emulators
+   # Select: Firestore, Hosting, Emulators (use spacebar to select)
    # Use existing project: timeto-69867
    # Accept defaults for Firestore rules and indexes
    # For emulators, select: Auth and Firestore
    ```
 
 4. Set up Local Backup:
+
+   On Windows (using PowerShell):
+   ```powershell
+   # Create directories
+   New-Item -ItemType Directory -Force -Path local-backup/auth_export
+   New-Item -ItemType Directory -Force -Path local-backup/firestore_export
+
+   # Create metadata file
+   $metadata = @'
+   {
+     "version": "11.29.1",
+     "firestore": {
+       "version": "1.17.4",
+       "path": "firestore_export",
+       "metadata_file": "firestore_export/metadata.json"
+     },
+     "auth": {
+       "version": "11.29.1",
+       "path": "auth_export"
+     }
+   }
+   '@
+   $metadata | Out-File -FilePath local-backup/firebase-export-metadata.json -Encoding UTF8
+   ```
+
+   On Mac/Linux:
    ```bash
-   # Create local-backup directory
+   # Create directories
    mkdir -p local-backup/auth_export
    mkdir -p local-backup/firestore_export
 
-   # Create firebase-export-metadata.json in local-backup
+   # Create metadata file
    echo '{
      "version": "11.29.1",
      "firestore": {
@@ -113,16 +140,11 @@ A web application for managing events and organizations, built with React, Fireb
 
 5. Initialize Emulator with Local Data:
    ```bash
-   # Download emulator files
+   # Download emulator files (select Java version if prompted)
    firebase init emulators
 
    # Start emulators with local backup data
    firebase emulators:start --import=local-backup --export-on-exit=local-backup
-
-   # This will:
-   # 1. Start the emulators
-   # 2. Import test data from local-backup directory
-   # 3. Save any changes back to local-backup when you stop the emulators
    ```
 
 6. Setup Test Authentication:
@@ -145,6 +167,19 @@ A web application for managing events and organizations, built with React, Fireb
    ```
 
 8. Open http://localhost:5173 in your browser and login with the test credentials
+
+## Platform-Specific Notes
+
+### Windows
+- Use PowerShell for best compatibility
+- If you get permission errors, run PowerShell as Administrator
+- Line endings might need to be converted (git config --global core.autocrlf true)
+- Java SDK is required for Firebase emulators
+
+### Mac/Linux
+- Terminal commands should work as is
+- If you get permission errors, prefix commands with sudo
+- Make sure Java is installed (brew install java on Mac)
 
 ## Available Scripts
 
