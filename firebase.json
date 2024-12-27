@@ -22,10 +22,10 @@
       "port": 9099
     },
     "firestore": {
-      "port": "8080"
+      "port": 8081
     },
     "hosting": {
-      "port": 5001
+      "port": 5002
     },
     "ui": {
       "enabled": true,

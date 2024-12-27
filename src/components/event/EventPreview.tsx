@@ -17,18 +17,73 @@ import {
   QuestionMarkCircleIcon,
   PencilIcon,
 } from '@heroicons/react/24/outline';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useEvent } from '../../contexts/EventContext';
 import { EventMembers } from './EventMembers';
+import { useMember } from '../../contexts/MemberContext';
 
 interface EventPreviewProps {
   event: Event;
   isEditMode?: boolean;
 }
 
+function AttendeeAvatar({ member }: { member: Member }) {
+  return (
+    <div className="relative group cursor-pointer">
+      <div className="h-8 w-8 transition-transform group-hover:scale-110">
+        {member.photoUrl ? (
+          <img 
+            src={member.photoUrl} 
+            alt={`${member.firstName} ${member.lastName}`}
+            className="h-8 w-8 rounded-full object-cover ring-2 ring-white dark:ring-gray-800"
+          />
+        ) : (
+          <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center ring-2 ring-white dark:ring-gray-800">
+            <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {member.firstName ? member.firstName[0].toUpperCase() : '?'}
+            </span>
+          </div>
+        )}
+
+        {/* Tooltip */}
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap invisible group-hover:visible transition-all">
+          {member.firstName || member.lastName ? 
+            `${member.firstName} ${member.lastName}`.trim() : 
+            'Unknown Member'}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+            <div className="border-4 border-transparent border-t-gray-900"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const { updateEvent } = useEvent();
+  const { registeredMembers, loadMembers } = useMember();
+  
+  // Load members when component mounts
+  useEffect(() => {
+    loadMembers(event.id);
+  }, [event.id, loadMembers]);
+
+  // Helper function to get member data
+  const getMemberData = (memberId: string) => {
+    const member = registeredMembers.find(m => m.id === memberId);
+    console.log('Getting member data:', { memberId, found: !!member, member });
+    return member || {
+      id: memberId,
+      type: 'member' as const,
+      firstName: '',
+      lastName: '',
+      phoneNumber: '',
+      status: 'accepted' as const,
+      organizations: [],
+      photoUrl: ''
+    };
+  };
 
   const EditButton = ({ field }: { field: string }) => (
     <button
@@ -401,12 +456,13 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
   type WidgetType = Widget['type'];
   
   const getWidgetIcon = (type: Widget['type'], isEnabled: boolean) => {
-    const icons: Record<Widget['type'], typeof CloudIcon> = {
+    const icons: Record<string, typeof CloudIcon> = {
+      description: InformationCircleIcon,
       weather: CloudIcon,
       location: MapPinIcon,
-      attendees: UsersIcon,
-      photos: PhotoIcon,
       website: GlobeAltIcon,
+      phoneNumber: PhoneIcon,
+      photos: PhotoIcon,
       messageBoard: ChatBubbleLeftIcon,
       comments: ChatBubbleBottomCenterTextIcon,
       quickInfo: InformationCircleIcon,
@@ -421,13 +477,14 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
     }`} />;
   };
 
-  const getWidgetName = (type: WidgetType) => {
-    const names: Record<WidgetType, string> = {
+  const getWidgetName = (type: Widget['type']) => {
+    const names: Record<string, string> = {
+      description: 'Description',
       weather: 'Weather',
       location: 'Location',
-      attendees: 'Attendees',
-      photos: 'Photos/Media',
       website: 'Website',
+      phoneNumber: 'Phone',
+      photos: 'Photos',
       messageBoard: 'Message Board',
       comments: 'Comments',
       quickInfo: 'Quick Info',
@@ -437,29 +494,123 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
     return names[type] || type;
   };
 
+  const getWidgetStatus = (widgetType: Widget['type']) => {
+    // Check if the widget type exists in the event widgets array
+    return event.widgets?.some(widget => 
+      typeof widget === 'object' && widget.type === widgetType
+    );
+  };
+
+  // Keep the exact names from the database for the enabled widgets
   const availableWidgets: Widget['type'][] = [
+    'description',
     'weather',
     'location',
-    'attendees',
     'photos',
     'website',
+    'phoneNumber',
     'messageBoard',
     'comments',
     'quickInfo',
     'call',
   ];
 
-  const getWidgetStatus = (widgetType: Widget['type']) => {
-    // First check if the widget exists in event.widgets
-    const widget = event.widgets.find(w => w.type === widgetType);
-    
-    // If widget exists, use its enabled status
-    if (widget) {
-      return widget.isEnabled;
-    }
-    
-    // If widget doesn't exist, it should be considered disabled
-    return false;
+  const renderAttendees = () => {
+    // Get attendees from event document
+    const attendeesList = Array.isArray(event?.attendees) ? event.attendees : [];
+    const acceptedList = Array.isArray(event?.accepted) ? event.accepted : [];
+    const declinedList = Array.isArray(event?.declined) ? event.declined : [];
+    const undecidedList = Array.isArray(event?.undecided) ? event.undecided : [];
+
+    // Debug logs
+    console.log('Raw event data:', event);
+    console.log('Event attendees arrays:', {
+      attendeesList,
+      acceptedList,
+      declinedList,
+      undecidedList
+    });
+
+    // Get member details for each attendee
+    const attendeeMembers = attendeesList.map(id => registeredMembers.find(m => m.id === id)).filter(Boolean);
+    const acceptedMembers = acceptedList.map(id => registeredMembers.find(m => m.id === id)).filter(Boolean);
+    const undecidedMembers = undecidedList.map(id => registeredMembers.find(m => m.id === id)).filter(Boolean);
+
+    console.log('Mapped member details:', {
+      attendeeMembers,
+      acceptedMembers,
+      undecidedMembers
+    });
+
+    return (
+      <div>
+        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
+          Attendees
+        </dt>
+        <dd className="mt-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="space-y-4">
+            {/* Accepted attendees */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                <span>Attending</span>
+                <span className="text-xs text-gray-500">({acceptedList.length})</span>
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {acceptedList.map((attendeeId) => (
+                  <AttendeeAvatar key={attendeeId} member={getMemberData(attendeeId)} />
+                ))}
+              </div>
+            </div>
+
+            {/* Maybe/Undecided attendees */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                <span>Maybe</span>
+                <span className="text-xs text-gray-500">({undecidedList.length})</span>
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {undecidedList.map((attendeeId) => (
+                  <AttendeeAvatar key={attendeeId} member={getMemberData(attendeeId)} />
+                ))}
+              </div>
+            </div>
+
+            {/* Pending attendees */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                <span>Pending</span>
+                <span className="text-xs text-gray-500">({attendeesList.length})</span>
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {attendeesList.map((attendeeId) => (
+                  <AttendeeAvatar key={attendeeId} member={getMemberData(attendeeId)} />
+                ))}
+              </div>
+            </div>
+
+            {/* Declined attendees */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                <span>Declined</span>
+                <span className="text-xs text-gray-500">({declinedList.length})</span>
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {declinedList.map((attendeeId) => (
+                  <AttendeeAvatar key={attendeeId} member={getMemberData(attendeeId)} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {(!attendeesList.length && !acceptedList.length && 
+            !declinedList.length && !undecidedList.length) && (
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              No attendees yet
+            </span>
+          )}
+        </dd>
+      </div>
+    );
   };
 
   return (
@@ -498,6 +649,7 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
                 { label: 'Public', value: 'public' }
               ]
             )}
+            {renderAttendees()}
           </dl>
         </div>
 
@@ -514,6 +666,11 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
         <div className="mt-4 grid grid-cols-2 gap-4">
           {availableWidgets.map(widgetType => {
             const isEnabled = getWidgetStatus(widgetType);
+            console.log('Widget Render:', {
+              widgetType,
+              isEnabled,
+              widgetsList: availableWidgets
+            });
             
             return (
               <div 

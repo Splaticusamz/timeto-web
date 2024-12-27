@@ -25,7 +25,7 @@ const db = getFirestore(app);
 
 if (import.meta.env.VITE_USE_EMULATOR === 'true') {
   // Connect to emulators before any other Firestore operations
-  connectFirestoreEmulator(db, 'localhost', 8080);
+  connectFirestoreEmulator(db, 'localhost', 8081);
   connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
   
   // Enable persistence after emulator connection

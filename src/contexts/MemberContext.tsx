@@ -24,16 +24,87 @@ export function MemberProvider({ children }: { children: React.ReactNode }) {
   const loadMembers = useCallback(async (eventId: string) => {
     setLoading(true);
     try {
-      const eventDoc = await getDoc(doc(db, 'events', eventId));
-      const organizationId = eventDoc.data()?.owner;
+      console.log('Loading members for event:', eventId);
 
-      if (!organizationId) {
-        throw new Error('No organization ID found for event');
+      // First try events collection
+      const eventRef = doc(db, 'events', eventId);
+      const eventDoc = await getDoc(eventRef);
+      let eventData = eventDoc.exists() ? eventDoc.data() : null;
+
+      // If not in events, try publicEvents
+      if (!eventDoc.exists()) {
+        const publicEventRef = doc(db, 'publicEvents', eventId);
+        const publicEventDoc = await getDoc(publicEventRef);
+        eventData = publicEventDoc.exists() ? publicEventDoc.data() : null;
       }
 
-      // Load leads (invited members)
-      const leadsRef = collection(db, 'organizations', organizationId, 'leads');
+      if (!eventData) {
+        throw new Error('Event not found');
+      }
+
+      // Get all attendee IDs from both event and user timelines
+      const attendeeIds = new Set([
+        ...(eventData.attendees || []),
+        ...(eventData.accepted || []),
+        ...(eventData.declined || []),
+        ...(eventData.undecided || [])
+      ]);
+
+      // For each attendee, check their timeline
+      const timelinePromises = Array.from(attendeeIds).map(async (userId) => {
+        const timelineRef = doc(db, 'users', userId, 'timeline', eventId);
+        const timelineDoc = await getDoc(timelineRef);
+        if (timelineDoc.exists()) {
+          const timelineData = timelineDoc.data();
+          // If found in timeline, update their status
+          if (timelineData.event?.accepted?.includes(userId)) {
+            return { userId, status: 'accepted' as const };
+          } else if (timelineData.event?.declined?.includes(userId)) {
+            return { userId, status: 'declined' as const };
+          } else if (timelineData.event?.undecided?.includes(userId)) {
+            return { userId, status: 'maybe' as const };
+          }
+        }
+        return { userId, status: 'pending' as const };
+      });
+
+      const timelineResults = await Promise.all(timelinePromises);
+      const statusMap = new Map(timelineResults.map(r => [r.userId, r.status]));
+
+      // Get user documents
+      const userPromises = Array.from(attendeeIds).map(userId => 
+        getDoc(doc(db, 'users', userId))
+      );
+      
+      const userDocs = await Promise.all(userPromises);
+      const attendeeMap = new Map();
+
+      userDocs.forEach(doc => {
+        if (doc.exists()) {
+          const data = doc.data();
+          const status = statusMap.get(doc.id) || 'pending';
+          attendeeMap.set(doc.id, {
+            id: doc.id,
+            type: 'member' as const,
+            firstName: data.firstName || '',
+            lastName: data.lastName || '',
+            status,
+            organizations: data.referralOrganizations || [],
+            photoUrl: data.profileImageUrl || '',
+            phoneNumber: data.phoneNumber || '',
+          });
+        }
+      });
+
+      // Debug leads query and load leads (invited members)
+      const leadsRef = collection(db, 'organizations', eventData.owner, 'leads');
       const leadsSnapshot = await getDocs(leadsRef);
+      console.log('Leads query:', {
+        organizationId: eventData.owner,
+        leadsCount: leadsSnapshot.size,
+        leads: leadsSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}))
+      });
+
       const leads = leadsSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -43,19 +114,19 @@ export function MemberProvider({ children }: { children: React.ReactNode }) {
           lastName: data.lastName || '',
           phoneNumber: data.phoneNumber || '',
           status: data.status || 'pending',
-          organizations: [organizationId],
+          organizations: data.referalOrgs || [eventData.owner],
           photoUrl: data.photoUrl,
         };
       });
 
-      // Load registered members from users collection and organization members
+      // Debug users query and load registered members
       const usersRef = collection(db, 'users');
-      const membersRef = collection(db, 'organizations', organizationId, 'members');
+      const membersRef = collection(db, 'organizations', eventData.owner, 'members');
 
       // Get users who have this org in their referralOrganizations
       const usersQuery = query(
         usersRef,
-        where('referralOrganizations', 'array-contains', organizationId)
+        where('referralOrganizations', 'array-contains', eventData.owner)
       );
 
       const [usersSnapshot, membersSnapshot] = await Promise.all([
@@ -63,31 +134,31 @@ export function MemberProvider({ children }: { children: React.ReactNode }) {
         getDocs(membersRef)
       ]);
 
-      console.log('Users from referralOrganizations:', usersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })));
-
-      console.log('Members from org members collection:', membersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })));
+      console.log('Debug - Query Results:', {
+        usersCount: usersSnapshot.size,
+        membersCount: membersSnapshot.size,
+        organizationId: eventData.owner
+      });
 
       // First, get all the members from the members collection
       const memberDocsMap = new Map();
       membersSnapshot.docs.forEach(doc => {
         const data = doc.data();
         console.log('Processing member doc:', { id: doc.id, ...data });
-        memberDocsMap.set(doc.id, {
-          id: doc.id,
-          type: 'member' as const,
-          firstName: data.firstName || '',
-          lastName: data.lastName || '',
-          status: 'transformed' as const,
-          organizations: [organizationId],
-          photoUrl: data.profileImageUrl || data.photoUrl || '',
-          phoneNumber: '',
-        });
+        
+        // Only add if we have a valid user document
+        if (data.userId) {
+          memberDocsMap.set(data.userId, {
+            id: data.userId,
+            type: 'member' as const,
+            firstName: data.firstName || '',
+            lastName: data.lastName || '',
+            status: 'transformed' as const,
+            organizations: [eventData.owner],
+            photoUrl: data.profileImageUrl || data.photoUrl || '',
+            phoneNumber: data.phoneNumber || '',
+          });
+        }
       });
 
       // Then add or update with users that have this org in their referralOrganizations
@@ -100,6 +171,7 @@ export function MemberProvider({ children }: { children: React.ReactNode }) {
           isOnboard: data.isOnboard,
           referralOrganizations: data.referralOrganizations
         });
+
         if (data.isOnboard !== false) {
           memberDocsMap.set(doc.id, {
             id: doc.id,
@@ -107,9 +179,9 @@ export function MemberProvider({ children }: { children: React.ReactNode }) {
             firstName: data.firstName || '',
             lastName: data.lastName || '',
             status: 'transformed' as const,
-            organizations: data.referralOrganizations || [organizationId],
+            organizations: data.referralOrganizations || [eventData.owner],
             photoUrl: data.profileImageUrl || '',
-            phoneNumber: '',
+            phoneNumber: data.phoneNumber || '',
           });
         }
       });
@@ -117,19 +189,30 @@ export function MemberProvider({ children }: { children: React.ReactNode }) {
       const registeredMembersList = Array.from(memberDocsMap.values())
         .filter(member => member.firstName || member.lastName);
 
-      console.log('Final member count:', registeredMembersList.length);
-      console.log('Members filtered out:', 
-        Array.from(memberDocsMap.values()).length - registeredMembersList.length);
-      console.log('Members without names:', 
-        Array.from(memberDocsMap.values())
-          .filter(member => !member.firstName && !member.lastName)
-          .map(m => m.id)
+      // Merge attendees with other members
+      const allMembers = [
+        ...leads,
+        ...registeredMembersList,
+        ...Array.from(attendeeMap.values())
+      ];
+
+      // Remove duplicates by ID
+      const uniqueMembers = Array.from(
+        new Map(allMembers.map(member => [member.id, member])).values()
       );
 
+      console.log('Final results:', {
+        leadsCount: leads.length,
+        registeredCount: registeredMembersList.length,
+        attendeesCount: attendeeMap.size,
+        totalUniqueMembers: uniqueMembers.length
+      });
+
       setMembers(leads);
-      setRegisteredMembers(registeredMembersList);
+      setRegisteredMembers(uniqueMembers.filter(m => m.type === 'member'));
 
     } catch (err) {
+      console.error('Failed to load members:', err);
       setError('Failed to load members');
     } finally {
       setLoading(false);

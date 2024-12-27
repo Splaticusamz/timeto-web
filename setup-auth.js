@@ -3,7 +3,7 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
 // Set emulator hosts before initialization
-process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
+process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8081';
 process.env.FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
 
 // Initialize Firebase Admin without credentials for emulator

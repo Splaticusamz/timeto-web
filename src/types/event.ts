@@ -14,7 +14,7 @@ export interface EventLocation {
 
 export interface Widget {
   id: string;
-  type: 'photos' | 'location' | 'messageBoard' | 'comments' | 'attendees' | 'quickInfo' | 'weather' | 'website' | 'call';
+  type: 'description' | 'weather' | 'location' | 'website' | 'phoneNumber' | 'messageBoard' | 'comments' | 'quickInfo' | 'call';
   config: Record<string, any>;
   data: Record<string, any>;
   order: number;
@@ -34,23 +34,24 @@ export interface Event {
   description: string;
   start: Date;
   end?: Date;
-  timezone: string;
+  timezone?: string;
   location: EventLocation;
-  visibility: EventVisibility;
-  recurrence?: RecurrenceRule;
-  widgets: Widget[];
+  visibility: 'organization' | 'invite-only' | 'public';
+  widgets: string[];
   createdAt: Date;
   updatedAt: Date;
-  organizationId: string;
   owner: string;
-  status: 'draft' | 'published';
-  source: 'events' | 'publicEvents';
+  organizationId: string;
+  status: EventStatus;
   photo?: string;
   phoneNumber?: string;
   website?: string;
-  coverPhoto?: string;
   coverImage?: string;
   logoImage?: string;
+  attendees?: string[];
+  accepted?: string[];
+  declined?: string[];
+  undecided?: string[];
 }
 
 export interface CreateEventData {

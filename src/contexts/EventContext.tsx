@@ -58,82 +58,94 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       const loadedEvents: Event[] = [
         ...privateEvents.docs.map(doc => {
           const data = doc.data();
-          const widgetObjects = (data.widgets || []).map((widgetId: string) => ({
-            id: widgetId,
-            type: widgetId,
-            config: data.widgetConfigs?.[widgetId] || {},
-            data: data.widgetData?.[widgetId] || {},
-            order: 0,
-            isEnabled: true
-          }));
-
-          const start = data.start?._seconds 
-            ? new Date(data.start._seconds * 1000) 
-            : data.start instanceof Date 
-              ? data.start 
-              : new Date(data.start);
-
-          const end = data.end?._seconds 
-            ? new Date(data.end._seconds * 1000) 
-            : data.end instanceof Date 
-              ? data.end 
-              : data.end ? new Date(data.end) : undefined;
-
+          console.log('Raw Firestore data:', data);
+          
           return {
             id: doc.id,
             source: 'events' as const,
             title: data.title || '',
             description: data.description || '',
-            start: start,
-            end: end,
+            start: data.start?._seconds 
+              ? new Date(data.start._seconds * 1000) 
+              : data.start instanceof Date 
+                ? data.start 
+                : new Date(data.start),
+            end: data.end?._seconds 
+              ? new Date(data.end._seconds * 1000) 
+              : data.end instanceof Date 
+                ? data.end 
+                : data.end ? new Date(data.end) : undefined,
             timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
             organizationId: data.organizationId,
             owner: data.owner,
             status: data.status || 'draft',
             visibility: data.visibility || 'organization',
             location: data.location || { type: 'fixed' as const },
-            widgets: widgetObjects,
-            createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
-            updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
+            widgets: data.widgets?.map((w: string) => ({
+              id: w,
+              type: w,
+              config: {},
+              data: {},
+              order: 0,
+              isEnabled: true
+            })) || [],
+            createdAt: new Date(),
+            updatedAt: new Date(),
             photo: data.photo || data.photoUrl || data.image || data.imageUrl,
             phoneNumber: data.phoneNumber || data.phone || data.tel,
             website: data.website || data.url || data.webUrl,
             coverImage: data.coverImage || data.coverPhoto || data.cover,
             logoImage: data.logoImage || data.logo,
+            attendees: Array.isArray(data.attendees) ? data.attendees : [],
+            accepted: Array.isArray(data.accepted) ? data.accepted : [],
+            declined: Array.isArray(data.declined) ? data.declined : [],
+            undecided: Array.isArray(data.undecided) ? data.undecided : [],
           } as Event;
         }),
         ...publicEvents.docs.map(doc => {
           const data = doc.data();
-          const widgetObjects = (data.widgets || []).map((widgetId: string) => ({
-            id: widgetId,
-            type: widgetId,
-            config: {},
-            data: {},
-            order: 0,
-            isEnabled: true
-          }));
+          console.log('Raw public event data:', data);
 
           return {
             id: doc.id,
             source: 'publicEvents' as const,
             title: data.title || '',
             description: data.description || '',
-            start: data.start?._seconds ? new Date(data.start._seconds * 1000) : new Date(),
-            end: data.end?._seconds ? new Date(data.end._seconds * 1000) : undefined,
-            timezone: data.timezone || 'UTC',
+            start: data.start?._seconds 
+              ? new Date(data.start._seconds * 1000) 
+              : data.start instanceof Date 
+                ? data.start 
+                : new Date(data.start),
+            end: data.end?._seconds 
+              ? new Date(data.end._seconds * 1000) 
+              : data.end instanceof Date 
+                ? data.end 
+                : data.end ? new Date(data.end) : undefined,
+            timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
             organizationId: data.organizationId || currentOrganization.id,
             owner: data.owner || currentOrganization.id,
             status: data.status || 'published',
             visibility: data.visibility || 'organization',
             location: data.location || { type: 'fixed' as const },
-            widgets: widgetObjects,
+            widgets: data.widgets?.map((w: string) => ({
+              id: w,
+              type: w,
+              config: {},
+              data: {},
+              order: 0,
+              isEnabled: true
+            })) || [],
             createdAt: new Date(),
             updatedAt: new Date(),
-            photo: data.photo,
-            website: data.website,
-            phoneNumber: data.phoneNumber,
-            coverImage: data.coverImage,
-            logoImage: data.logoImage,
+            photo: data.photo || data.photoUrl || data.image || data.imageUrl,
+            phoneNumber: data.phoneNumber || data.phone || data.tel,
+            website: data.website || data.url || data.webUrl,
+            coverImage: data.coverImage || data.coverPhoto || data.cover,
+            logoImage: data.logoImage || data.logo,
+            attendees: Array.isArray(data.attendees) ? data.attendees : [],
+            accepted: Array.isArray(data.accepted) ? data.accepted : [],
+            declined: Array.isArray(data.declined) ? data.declined : [],
+            undecided: Array.isArray(data.undecided) ? data.undecided : [],
           } as Event;
         })
       ];

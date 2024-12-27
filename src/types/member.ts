@@ -1,15 +1,15 @@
-export type MemberStatus = 'pending' | 'transformed' | 'invited';
+export type MemberStatus = 'pending' | 'transformed' | 'invited' | 'accepted' | 'declined' | 'maybe';
 export type MemberType = 'lead' | 'member';
 
 export interface Member {
   id: string;
+  type: MemberType;
   firstName: string;
   lastName: string;
   phoneNumber: string;
   status: MemberStatus;
-  type: MemberType;
-  photoUrl?: string;
   organizations: string[];
+  photoUrl?: string;
 }
 
 // Add new types to handle the different collections
