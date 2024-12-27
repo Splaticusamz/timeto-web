@@ -54,3 +54,4 @@ service-account-backup-NO-TOUCHING.json
 local-backup/
 firestore-backup.json
 service-account*.json
+server-init.txt

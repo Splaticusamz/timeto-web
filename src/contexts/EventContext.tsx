@@ -35,8 +35,6 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
-      console.log('Loading events for organization:', currentOrganization.id);
-      
       // Load from both events and publicEvents collections
       const eventsRef = collection(db, 'events');
       const publicEventsRef = collection(db, 'publicEvents');
@@ -56,15 +54,6 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
           orderBy('start', 'desc')
         ))
       ]);
-
-      console.log('Found private events:', {
-        size: privateEvents.size,
-        data: privateEvents.docs.map(doc => ({id: doc.id, ...doc.data()}))
-      });
-      console.log('Found public events:', {
-        size: publicEvents.size,
-        data: publicEvents.docs.map(doc => ({id: doc.id, ...doc.data()}))
-      });
 
       const loadedEvents: Event[] = [
         ...privateEvents.docs.map(doc => {
@@ -149,19 +138,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
         })
       ];
 
-      console.log('Total events loaded:', loadedEvents.length);
-      console.log('Private events statuses:', privateEvents.docs.map(doc => ({
-        id: doc.id,
-        status: doc.data().status
-      })));
-      console.log('Public events statuses:', publicEvents.docs.map(doc => ({
-        id: doc.id,
-        status: doc.data().status
-      })));
-
       setEvents(loadedEvents);
     } catch (err) {
-      console.error('Error loading events:', err);
       setError('Failed to load events');
     } finally {
       setLoading(false);
@@ -210,7 +188,6 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       setEvents((prev) => [newEvent, ...prev]);
       return newEvent;
     } catch (err) {
-      console.error('Error creating event:', err);
       throw new Error('Failed to create event');
     }
   }, [currentUser, currentOrganization]);
@@ -250,7 +227,6 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
 
       return updatedEvent;
     } catch (err) {
-      console.error('Error updating event:', err);
       throw new Error('Failed to update event');
     }
   }, [currentUser]);
@@ -264,7 +240,6 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       await deleteDoc(doc(db, 'events', id));
       setEvents((prev) => prev.filter((event) => event.id !== id));
     } catch (err) {
-      console.error('Error deleting event:', err);
       throw new Error('Failed to delete event');
     }
   }, [currentUser]);
@@ -282,7 +257,6 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
         status: 'draft'
       });
     } catch (err) {
-      console.error('Error saving draft:', err);
       throw new Error('Failed to save draft');
     }
   }, [currentUser]);

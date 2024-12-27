@@ -1,0 +1,163 @@
+Root
+├── chats
+│   └── (empty collection, but exists)
+│
+├── contentReports
+│   ├── eventId: string
+│   ├── issue: string
+│   ├── eventName: string
+│   ├── type: string
+│   ├── userName: string
+│   ├── userId: string
+│   └── content: string
+│
+├── events
+│   ├── owner: string
+│   ├── data: object{dob: timestamp}
+│   ├── attendees: array
+│   ├── start: timestamp
+│   ├── description: string
+│   ├── source: string
+│   ├── title: string
+│   ├── type: string
+│   ├── widgets: array<string>
+│   ├── system: object{preventTimelineForwarding: boolean}
+│   ├── isFullDay: boolean
+│   ├── isPublic: boolean
+│   ├── isDiscoverable: boolean
+│   ├── end: timestamp
+│   └── id: string
+│
+├── fcmTokens
+│   └── token: string
+│
+├── leads
+│   ├── firstName: string
+│   ├── lastName: string
+│   ├── phoneNumber: string
+│   ├── referalOrgs: array<string>
+│   ├── email: string
+│   ├── status: string
+│   └── convertedTo: string
+│
+├── organizations
+│   ├── logoImage: string
+│   ├── name: string
+│   ├── description: string
+│   ├── id: string
+│   ├── type: string
+│   ├── fullImage: string|null
+│   ├── previewImage: string|null
+│   ├── featuredEvents: array<string>
+│   │
+│   ├── subcollections/
+│   │   ├── leads/
+│   │   │   ├── firstName: string
+│   │   │   ├── lastName: string
+│   │   │   ├── phoneNumber: string
+│   │   │   ├── referalOrgs: array<string>
+│   │   │   ├── email: string
+│   │   │   ├── status: string
+│   │   │   └── convertedTo: string
+│   │   │
+│   │   ├── members/
+│   │   │   └── id: string
+│   │   │
+│   │   └── org.followers/
+│   │       ├── followedAt: timestamp
+│   │       └── id: string
+│
+├── publicEvents
+│   ├── owner: string
+│   ├── website: string
+│   ├── attendees: array<string>
+│   ├── start: timestamp
+│   ├── description: string
+│   ├── accepted: array<string>
+│   ├── source: string
+│   ├── title: string
+│   ├── widgets: array<string>
+│   ├── type: string
+│   ├── declined: array
+│   ├── isFullDay: boolean
+│   ├── logoImage: string
+│   ├── undecided: array
+│   ├── coverImage: string
+│   ├── isDiscoverable: boolean
+│   ├── isPublic: boolean
+│   ├── location: object{
+│   │   ├── coordinate: object{latitude: number, longitude: number}
+│   │   ├── address: string
+│   │   ├── title: string
+│   │   └── place_id: string
+│   │   }
+│   ├── end: timestamp
+│   ├── id: string
+│   ├── phoneNumber: string
+│   └── discoverable: boolean
+│
+├── publicEvents_meta
+│   ├── description: string
+│   └── embedding: object{_values: array<number>}
+│
+├── recurrences
+│   ├── owner: string
+│   ├── id: string
+│   ├── type: string
+│   ├── event: object{...}  // Complex event object with multiple variations
+│   └── repetition: object{
+│       ├── duration: number
+│       ├── weekDays: array<number>
+│       ├── timezone: string
+│       ├── start: timestamp
+│       ├── end: timestamp
+│       └── time: string
+│       }
+│
+├── scheduledNotifications
+│   ├── owner: string
+│   ├── eventId: string
+│   ├── timeBeforeEvent: number
+│   ├── nextNotification: timestamp
+│   └── recurrenceId: string
+│
+├── userSettings
+│   ├── enabledNotifications: boolean
+│   └── test: string
+│
+└── users
+    ├── firstName: string
+    ├── lastName: string
+    ├── dob: timestamp
+    ├── s_meta: object{...}  // Complex metadata object
+    ├── id: string
+    ├── referralOrganizations: array<string>
+    ├── isOnboard: boolean
+    ├── profileImageUrl: string|null
+    ├── created: timestamp
+    │
+    ├── subcollections/
+    │   ├── notifications/
+    │   │   ├── eventId: string
+    │   │   ├── createdAt: timestamp
+    │   │   ├── eventPath: string
+    │   │   ├── organization: object{
+    │   │   │   ├── logoImage: string
+    │   │   │   ├── name: string
+    │   │   │   ├── description: string
+    │   │   │   ├── featuredEvents: array<string>
+    │   │   │   ├── id: string
+    │   │   │   ├── type: string
+    │   │   │   ├── fullImage: string
+    │   │   │   └── previewImage: string
+    │   │   │   }
+    │   │   ├── id: string
+    │   │   ├── type: string
+    │   │   └── event: object{...}  // Complex event object
+    │   │
+    │   ├── timeline/
+    │   │   ├── event: object{...}  // Complex event object
+    │   │   └── status: string
+    │   │
+    │   └── recurrences/
+    │       └── (empty but exists)

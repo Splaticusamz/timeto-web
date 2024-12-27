@@ -4,6 +4,7 @@ interface MemberTableProps {
   members: Member[];
   showStatus?: boolean;
   startIndex?: number;
+  isRegisteredView?: boolean;
 }
 
 function StatusBadge({ status }: { status: MemberStatus }) {
@@ -29,8 +30,17 @@ function StatusBadge({ status }: { status: MemberStatus }) {
 export function MemberTable({ 
   members, 
   showStatus = true, 
-  startIndex = 0 
+  startIndex = 0,
+  isRegisteredView = false
 }: MemberTableProps) {
+  if (!members || members.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No members found
+      </div>
+    );
+  }
+
   return (
     <table className="w-full">
       <thead>
@@ -38,17 +48,19 @@ export function MemberTable({
           <th className="w-8 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
             #
           </th>
-          <th className="w-12"></th>
+          {isRegisteredView && <th className="w-12"></th>}
           <th className="py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
             First Name
           </th>
           <th className="py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
             Last Name
           </th>
-          <th className="py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
-            Phone Number
-          </th>
-          {showStatus && (
+          {!isRegisteredView && (
+            <th className="py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
+              Phone Number
+            </th>
+          )}
+          {showStatus && !isRegisteredView && (
             <th className="py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
               Status
             </th>
@@ -57,35 +69,39 @@ export function MemberTable({
       </thead>
       <tbody>
         {members.map((member, index) => (
-          <tr key={member.id}>
+          <tr key={member.id} className="border-b border-gray-100 dark:border-gray-700 last:border-b-0">
             <td className="py-2 text-sm px-4 text-gray-500 dark:text-gray-400">
               {startIndex + index + 1}
             </td>
-            <td className="py-2">
-              {member.photoUrl ? (
-                <img 
-                  src={member.photoUrl} 
-                  alt={`${member.firstName} ${member.lastName}`}
-                  className="h-8 w-8 rounded-full object-cover"
-                />
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {member.firstName[0]}
-                  </span>
-                </div>
-              )}
-            </td>
+            {isRegisteredView && (
+              <td className="py-2">
+                {member.photoUrl ? (
+                  <img 
+                    src={member.photoUrl} 
+                    alt={`${member.firstName} ${member.lastName}`}
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {member.firstName ? member.firstName[0] : '?'}
+                    </span>
+                  </div>
+                )}
+              </td>
+            )}
             <td className="py-2 text-sm px-4 text-gray-900 dark:text-white">
               {member.firstName}
             </td>
             <td className="py-2 text-sm px-4 text-gray-900 dark:text-white">
               {member.lastName}
             </td>
-            <td className="py-2 text-sm px-4 text-gray-900 dark:text-white">
-              {member.phoneNumber}
-            </td>
-            {showStatus && (
+            {!isRegisteredView && member.phoneNumber && (
+              <td className="py-2 text-sm px-4 text-gray-900 dark:text-white">
+                {member.phoneNumber.startsWith('+') ? member.phoneNumber : `+${member.phoneNumber}`}
+              </td>
+            )}
+            {showStatus && !isRegisteredView && (
               <td className="py-2 px-4">
                 <StatusBadge status={member.status} />
               </td>

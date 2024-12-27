@@ -349,21 +349,6 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
     </div>
   );
 
-  console.log('Full event data:', JSON.stringify(event, null, 2));
-
-  console.log('Event data in preview:', {
-    photo: event.photo,
-    widgets: event.widgets,
-    fullEvent: event
-  });
-
-  console.log('Event image data:', {
-    coverImage: event.coverImage,
-    logoImage: event.logoImage,
-    photo: event.photo,
-    coverPhoto: event.coverPhoto
-  });
-
   const formatLocation = () => {
     switch (event.location.type) {
       case 'virtual':
@@ -398,7 +383,6 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
       if (isNaN(dateObj.getTime())) return 'Invalid Date';
       return format(dateObj, 'h:mm a');
     } catch (e) {
-      console.error('Error formatting time:', e);
       return 'Invalid Date';
     }
   };
@@ -410,7 +394,6 @@ export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
       if (isNaN(dateObj.getTime())) return 'Invalid Date';
       return format(dateObj, 'MMMM d, yyyy');
     } catch (e) {
-      console.error('Error formatting date:', e);
       return 'Invalid Date';
     }
   };

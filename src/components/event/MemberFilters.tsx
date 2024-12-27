@@ -3,10 +3,10 @@ import { MemberType } from '../../types/member';
 interface MemberFiltersProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
-  showLeads: boolean;
-  onShowLeadsChange: (value: boolean) => void;
-  showMembers: boolean;
-  onShowMembersChange: (value: boolean) => void;
+  showLeads?: boolean;
+  onShowLeadsChange?: (value: boolean) => void;
+  showMembers?: boolean;
+  onShowMembersChange?: (value: boolean) => void;
 }
 
 export function MemberFilters({
@@ -18,8 +18,8 @@ export function MemberFilters({
   onShowMembersChange
 }: MemberFiltersProps) {
   return (
-    <div className="mb-4 space-y-4">
-      <div>
+    <div className="mb-4 flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+      <div className="flex-1">
         <input
           type="text"
           value={searchTerm}
@@ -28,26 +28,36 @@ export function MemberFilters({
           className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
         />
       </div>
-      <div className="flex space-x-4">
-        <label className="inline-flex items-center">
+      
+      {showLeads !== undefined && onShowLeadsChange && (
+        <div className="flex items-center">
           <input
             type="checkbox"
+            id="showLeads"
             checked={showLeads}
             onChange={(e) => onShowLeadsChange(e.target.checked)}
-            className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
           />
-          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Show Leads</span>
-        </label>
-        <label className="inline-flex items-center">
+          <label htmlFor="showLeads" className="ml-2 text-sm text-gray-600 dark:text-gray-300">
+            Show Leads
+          </label>
+        </div>
+      )}
+      
+      {showMembers !== undefined && onShowMembersChange && (
+        <div className="flex items-center ml-4">
           <input
             type="checkbox"
+            id="showMembers"
             checked={showMembers}
             onChange={(e) => onShowMembersChange(e.target.checked)}
-            className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
           />
-          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Show Members</span>
-        </label>
-      </div>
+          <label htmlFor="showMembers" className="ml-2 text-sm text-gray-600 dark:text-gray-300">
+            Show Members
+          </label>
+        </div>
+      )}
     </div>
   );
 } 

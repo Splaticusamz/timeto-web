@@ -22,26 +22,42 @@ interface MemberTableProps {
   currentPage?: number;
   itemsPerPage?: number;
   startIndex?: number;
+  isRegisteredView?: boolean;
 }
 
-function MemberTable({ members, showStatus = true, currentPage = 1, itemsPerPage = 50, startIndex = 0 }: MemberTableProps) {
+function MemberTable({ members, showStatus = true, currentPage = 1, itemsPerPage = 50, startIndex = 0, isRegisteredView = false }: MemberTableProps) {
+  if (!members || members.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No members found
+      </div>
+    );
+  }
+
   return (
     <table className="w-full">
       <thead>
         <tr className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-          <th className="w-12 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
+          <th className="w-8 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
             #
           </th>
+          {isRegisteredView && (
+            <th className="w-12 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
+              Photo
+            </th>
+          )}
           <th className="py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
             First Name
           </th>
           <th className="py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
             Last Name
           </th>
-          <th className="py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
-            Phone Number
-          </th>
-          {showStatus && (
+          {!isRegisteredView && (
+            <th className="py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
+              Phone Number
+            </th>
+          )}
+          {showStatus && !isRegisteredView && (
             <th className="py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
               Status
             </th>
@@ -50,23 +66,39 @@ function MemberTable({ members, showStatus = true, currentPage = 1, itemsPerPage
       </thead>
       <tbody>
         {members.map((member, index) => (
-          <tr 
-            key={member.id}
-            className="border-b border-gray-100 dark:border-gray-700 last:border-b-0"
-          >
+          <tr key={member.id} className="border-b border-gray-100 dark:border-gray-700 last:border-b-0">
             <td className="py-2 text-sm px-4 text-gray-500 dark:text-gray-400">
               {startIndex + index + 1}
             </td>
+            {isRegisteredView && (
+              <td className="py-2 px-4">
+                {member.photoUrl ? (
+                  <img 
+                    src={member.photoUrl} 
+                    alt={`${member.firstName} ${member.lastName}`}
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {member.firstName ? member.firstName[0] : '?'}
+                    </span>
+                  </div>
+                )}
+              </td>
+            )}
             <td className="py-2 text-sm px-4 text-gray-900 dark:text-white">
               {member.firstName}
             </td>
             <td className="py-2 text-sm px-4 text-gray-900 dark:text-white">
               {member.lastName}
             </td>
-            <td className="py-2 text-sm px-4 text-gray-900 dark:text-white">
-              {member.phoneNumber.startsWith('+') ? member.phoneNumber : `+${member.phoneNumber}`}
-            </td>
-            {showStatus && (
+            {!isRegisteredView && (
+              <td className="py-2 text-sm px-4 text-gray-900 dark:text-white">
+                {member.phoneNumber.startsWith('+') ? member.phoneNumber : `+${member.phoneNumber}`}
+              </td>
+            )}
+            {showStatus && !isRegisteredView && (
               <td className="py-2 px-4">
                 <StatusBadge status={member.status} />
               </td>
@@ -116,7 +148,7 @@ export function EventMembers({ eventId }: EventMembersProps) {
 
   const [selectedTab, setSelectedTab] = useState(0);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const { members, loading, error, loadMembers, addMember, updateMemberStatus } = useMember();
+  const { members, registeredMembers, loading, error, loadMembers, addMember } = useMember();
   const itemsPerPage = 50;
 
   // Helper to get current tab state
@@ -139,19 +171,9 @@ export function EventMembers({ eventId }: EventMembersProps) {
 
   // Filter functions
   const filterMembers = (members: Member[], tabState: typeof tabStates.invited) => {
-    // First apply type filter
     let filtered = members;
-    if (!tabState.showLeads && !tabState.showMembers) {
-      return []; // Return empty if neither type is selected
-    }
-    if (!tabState.showLeads) {
-      filtered = filtered.filter(m => m.type === 'member');
-    }
-    if (!tabState.showMembers) {
-      filtered = filtered.filter(m => m.type === 'lead');
-    }
 
-    // Then apply search filter if there's a search term
+    // Apply search filter if there's a search term
     if (tabState.searchTerm) {
       filtered = filtered.filter(member => 
         `${member.firstName} ${member.lastName}`
@@ -165,69 +187,34 @@ export function EventMembers({ eventId }: EventMembersProps) {
 
   // Get paginated data for a specific tab
   const getPaginatedData = (members: Member[], tabState: typeof tabStates.invited) => {
+    console.log('getPaginatedData input:', { members, tabState });
     const filteredMembers = filterMembers(members, tabState);
+    console.log('filteredMembers:', filteredMembers);
     const startIndex = (tabState.currentPage - 1) * itemsPerPage;
     const endIndex = Math.min(startIndex + itemsPerPage, filteredMembers.length);
     const totalPages = Math.ceil(filteredMembers.length / itemsPerPage) || 1;
 
-    return {
+    const result = {
       members: filteredMembers.slice(startIndex, endIndex),
       totalPages,
       totalItems: filteredMembers.length,
       startIndex,
       currentPage: tabState.currentPage
     };
+    console.log('getPaginatedData output:', result);
+    return result;
   };
 
-  // Add back the useEffect to load members
   useEffect(() => {
-    console.log('Loading members for event:', eventId);
     loadMembers(eventId);
   }, [eventId, loadMembers]);
-
-  // Add debug logging after filtering
-  useEffect(() => {
-    if (members.length > 0) {
-      console.log('Total members:', members.length);
-      console.log('Total invited:', invitedMembers.length);
-      console.log('Total registered:', registeredMembers.length);
-      console.log('Members by type:', {
-        leads: members.filter(m => m.type === 'lead').length,
-        members: members.filter(m => m.type === 'member').length
-      });
-      console.log('Members by status:', {
-        pending: members.filter(m => m.status === 'pending').length,
-        transformed: members.filter(m => m.status === 'transformed').length
-      });
-    }
-  }, [members]);
-
-  // Filter base lists - keep all members in invited list
-  const invitedMembers = members; // All leads stay in invited list, this should be 275
-  const registeredMembers = members.filter(m => m.status === 'transformed'); // For count only
-  const allMembers = members; // For search tab
-
-  // Add debug logging to verify counts
-  useEffect(() => {
-    if (members.length > 0) {
-      console.log('Member counts:', {
-        total: members.length,
-        invited: invitedMembers.length,
-        registered: registeredMembers.length
-      });
-    }
-  }, [members, invitedMembers, registeredMembers]);
-
-  console.log('All members:', members);
-  console.log('Invited members:', invitedMembers);
-  console.log('Registered members:', registeredMembers);
 
   // Get paginated data for each tab
   const {
     members: paginatedInvited,
     totalPages: invitedPages,
     startIndex: invitedStartIndex
-  } = getPaginatedData(invitedMembers, tabStates.invited);
+  } = getPaginatedData(members, tabStates.invited);
 
   const {
     members: paginatedRegistered,
@@ -235,14 +222,21 @@ export function EventMembers({ eventId }: EventMembersProps) {
     startIndex: registeredStartIndex
   } = getPaginatedData(registeredMembers, tabStates.registered);
 
+  // Search tab should show 0 results since all members are already in other tabs
+  const searchMembers: Member[] = [];
   const {
     members: paginatedSearch,
     totalPages: searchPages
-  } = getPaginatedData(allMembers, tabStates.search);
+  } = getPaginatedData(searchMembers, tabStates.search);
 
-  console.log('Paginated invited:', paginatedInvited);
-  console.log('Paginated registered:', paginatedRegistered);
-  console.log('Paginated search:', paginatedSearch);
+  // Add debug logging
+  console.log('Members State:', {
+    members,
+    registeredMembers,
+    paginatedInvited,
+    paginatedRegistered,
+    paginatedSearch
+  });
 
   const handleAddMember = async (data: {
     firstName: string;
@@ -297,7 +291,7 @@ export function EventMembers({ eventId }: EventMembersProps) {
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }
           `}>
-            Invited Members ({invitedMembers.length})
+            Invited Members ({members.length})
           </Tab>
           <Tab className={({ selected }) => `
             px-4 py-2 text-sm font-medium border-b-2 
@@ -315,7 +309,7 @@ export function EventMembers({ eventId }: EventMembersProps) {
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }
           `}>
-            Search ({members.length})
+            Search (0)
           </Tab>
         </Tab.List>
 
@@ -336,6 +330,7 @@ export function EventMembers({ eventId }: EventMembersProps) {
                 currentPage={tabStates.invited.currentPage}
                 itemsPerPage={itemsPerPage}
                 startIndex={invitedStartIndex}
+                isRegisteredView={false}
               />
               <Pagination
                 currentPage={tabStates.invited.currentPage}
@@ -349,10 +344,6 @@ export function EventMembers({ eventId }: EventMembersProps) {
             <MemberFilters
               searchTerm={tabStates.registered.searchTerm}
               onSearchChange={(value) => updateTabState('registered', { searchTerm: value })}
-              showLeads={tabStates.registered.showLeads}
-              onShowLeadsChange={(value) => updateTabState('registered', { showLeads: value })}
-              showMembers={tabStates.registered.showMembers}
-              onShowMembersChange={(value) => updateTabState('registered', { showMembers: value })}
             />
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
               <MemberTable 
@@ -361,6 +352,7 @@ export function EventMembers({ eventId }: EventMembersProps) {
                 currentPage={tabStates.registered.currentPage}
                 itemsPerPage={itemsPerPage}
                 startIndex={registeredStartIndex}
+                isRegisteredView={true}
               />
               <Pagination
                 currentPage={tabStates.registered.currentPage}
@@ -374,10 +366,6 @@ export function EventMembers({ eventId }: EventMembersProps) {
             <MemberFilters
               searchTerm={tabStates.search.searchTerm}
               onSearchChange={(value) => updateTabState('search', { searchTerm: value })}
-              showLeads={tabStates.search.showLeads}
-              onShowLeadsChange={(value) => updateTabState('search', { showLeads: value })}
-              showMembers={tabStates.search.showMembers}
-              onShowMembersChange={(value) => updateTabState('search', { showMembers: value })}
             />
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
               <SearchTable members={paginatedSearch} />
