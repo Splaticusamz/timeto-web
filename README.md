@@ -1,57 +1,76 @@
-# Time To Web
+# TimeTo Web
 
-A web application for managing events and organizations.
-
-## Features
-
-- User authentication with Firebase Auth
-- Organization management
-- Event creation and management
-- Dark mode support
-- Responsive design
+A web application for managing events and organizations, built with React, Firebase, and TailwindCSS.
 
 ## Prerequisites
 
-- Node.js (v18 or higher)
-- npm (v9 or higher)
-- Firebase project
+- Node.js v18 or higher
+- npm v9 or higher
+- Firebase CLI (`npm install -g firebase-tools`)
+- Firebase project (create one at https://console.firebase.google.com)
 
 ## Setup
 
-1. Clone the repository:
+1. Clone and install dependencies:
    ```bash
-   git clone https://github.com/yourusername/timeto-web.git
+   git clone <repository-url>
    cd timeto-web
-   ```
-
-2. Install dependencies:
-   ```bash
    npm install
    ```
 
-3. Create environment files:
-   - Copy `.env.example` to `.env` for production settings
-   - Copy `.env.example` to `.env.development` for development settings
-   - Update the values in both files with your Firebase configuration
-
-4. Set up Firebase:
-   - Create a new Firebase project at https://console.firebase.google.com
-   - Enable Authentication with Email/Password provider
-   - Enable Firestore Database
-   - Copy your Firebase configuration to the environment files
-
-5. Start the development server:
+2. Firebase Setup:
    ```bash
-   # Start the Firestore and Auth emulators
+   # Login to Firebase
+   firebase login
+
+   # Initialize Firebase project
+   firebase init
+   # Select: Firestore, Hosting, Emulators
+   # Choose your project
+   # Accept defaults for Firestore rules and indexes
+   # For emulators, select: Auth and Firestore
+   ```
+
+3. Environment Setup:
+   ```bash
+   # Copy environment files
+   cp .env.example .env
+   cp .env.example .env.development
+
+   # Edit .env and .env.development with your Firebase config
+   # Get these values from Firebase Console > Project Settings > Web App
+   VITE_FIREBASE_API_KEY=xxx
+   VITE_FIREBASE_AUTH_DOMAIN=xxx
+   VITE_FIREBASE_PROJECT_ID=xxx
+   VITE_FIREBASE_STORAGE_BUCKET=xxx
+   VITE_FIREBASE_MESSAGING_SENDER_ID=xxx
+   VITE_FIREBASE_APP_ID=xxx
+   ```
+
+4. Initialize Emulator:
+   ```bash
+   # Download emulator files
+   firebase init emulators
+
+   # Import initial data (if you have firebase-export directory)
+   firebase emulators:start --import=firebase-export --export-on-exit
+
+   # Or start fresh
+   firebase emulators:start
+   ```
+
+5. Development:
+   ```bash
+   # Terminal 1: Start emulators
    npm run emulator
 
-   # In another terminal, start the development server
+   # Terminal 2: Start development server
    npm run dev
    ```
 
 6. Open http://localhost:5173 in your browser
 
-## Development
+## Available Scripts
 
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
@@ -60,44 +79,43 @@ A web application for managing events and organizations.
 - `npm run emulator` - Start Firebase emulators
 - `npm run init-emulator` - Initialize emulator with test data
 
-## Testing
+## Key Dependencies
 
-The application uses Firebase emulators for local development. This allows you to:
-- Test authentication without affecting production users
-- Use a local Firestore database
-- Develop without internet connection
+- React 18
+- Firebase 10
+- React Router 6
+- HeadlessUI
+- TailwindCSS
+- FullCalendar
+- TypeScript
+- Vite
 
-## Deployment
+## Development Notes
 
-1. Build the application:
-   ```bash
-   npm run build
-   ```
+- The app uses Firebase emulators for local development
+- Auth emulator runs on port 9099
+- Firestore emulator runs on port 8080
+- Data is persisted between emulator sessions if you use --export-on-exit
+- Use .env.development for local development settings
+- Use .env for production settings
 
-2. Deploy to Firebase:
-   ```bash
-   firebase deploy
-   ```
+## Firestore Schema
 
-## Project Structure
+The app expects the following collections:
+- `organizations/{orgId}/leads` - Invited members
+- `organizations/{orgId}/members` - Registered members
+- `users` - User profiles with `referralOrganizations` array
 
-```
-src/
-├── components/     # Reusable UI components
-├── contexts/       # React context providers
-├── pages/         # Page components
-├── types/         # TypeScript type definitions
-└── utils/         # Utility functions
-```
+## Common Issues
 
-## Contributing
+1. Emulator Connection:
+   - Ensure emulators are running before starting dev server
+   - Check ports 9099 (Auth) and 8080 (Firestore) are free
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Environment Variables:
+   - Must start with VITE_
+   - Restart dev server after changes
 
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+3. Firebase Setup:
+   - Enable Email/Password authentication in Firebase Console
+   - Set up Firestore rules and indexes
