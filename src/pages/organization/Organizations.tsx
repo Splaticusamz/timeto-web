@@ -21,6 +21,8 @@ export function Organizations() {
   const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hideZeroPrivate, setHideZeroPrivate] = useState(false);
+  const [hideZeroPublic, setHideZeroPublic] = useState(false);
   const observerTarget = useRef<HTMLDivElement>(null);
   const ITEMS_PER_PAGE = 10;
 
@@ -185,6 +187,14 @@ export function Organizations() {
     );
   };
 
+  // Filter organizations based on event counts
+  const filteredOrganizations = organizations.filter(org => {
+    const counts = organizationEventCounts[org.id] || { private: 0, public: 0 };
+    if (hideZeroPrivate && counts.private === 0) return false;
+    if (hideZeroPublic && counts.public === 0) return false;
+    return true;
+  });
+
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
@@ -203,24 +213,43 @@ export function Organizations() {
             />
           </div>
 
-          {/* Legend */}
+          {/* Legend and Filters */}
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <span className="inline-flex items-center px-3 py-1 text-sm rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
-                <UserIcon className="w-4 h-4 mr-1" />
-                Private
-              </span>
-              <span className="inline-flex items-center px-3 py-1 text-sm rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                <UsersIcon className="w-4 h-4 mr-1" />
-                Public
-              </span>
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <span className="inline-flex items-center px-3 py-1 text-sm rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                  <UserIcon className="w-4 h-4 mr-1" />
+                  Private
+                </span>
+                <input
+                  type="checkbox"
+                  checked={hideZeroPrivate}
+                  onChange={(e) => setHideZeroPrivate(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50 dark:border-gray-600 dark:bg-gray-700"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-300">Hide 0</span>
+              </label>
+
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <span className="inline-flex items-center px-3 py-1 text-sm rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
+                  <UsersIcon className="w-4 h-4 mr-1" />
+                  Public
+                </span>
+                <input
+                  type="checkbox"
+                  checked={hideZeroPublic}
+                  onChange={(e) => setHideZeroPublic(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50 dark:border-gray-600 dark:bg-gray-700"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-300">Hide 0</span>
+              </label>
             </div>
           </div>
         </div>
       </div>
 
       <div className="mt-6 space-y-4">
-        {organizations.map(org => (
+        {filteredOrganizations.map(org => (
           <div
             key={org.id}
             onClick={() => handleOrganizationClick(org.id)}

@@ -275,10 +275,14 @@ export default function Events() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900 dark:text-white">
-                            {new Date(event.start).toLocaleDateString()}
+                            {typeof event.start === 'object' && 'seconds' in event.start 
+                              ? new Date(event.start.seconds * 1000).toLocaleDateString()
+                              : new Date(event.start).toLocaleDateString()}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(event.start).toLocaleTimeString()}
+                            {typeof event.start === 'object' && 'seconds' in event.start
+                              ? new Date(event.start.seconds * 1000).toLocaleTimeString()
+                              : new Date(event.start).toLocaleTimeString()}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

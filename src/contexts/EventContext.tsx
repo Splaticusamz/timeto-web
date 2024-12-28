@@ -18,6 +18,29 @@ interface EventContextType {
 
 const EventContext = createContext<EventContextType | undefined>(undefined);
 
+// Helper function to handle Firestore timestamp objects
+const convertTimestamp = (timestamp: any): Date => {
+  if (!timestamp) return null;
+  
+  // Handle Firestore Timestamp instance
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate();
+  }
+  
+  // Handle raw timestamp object with _seconds and _nanoseconds
+  if (typeof timestamp === 'object' && '_seconds' in timestamp) {
+    return new Date(timestamp._seconds * 1000);
+  }
+  
+  // Handle raw timestamp object with seconds and nanoseconds
+  if (typeof timestamp === 'object' && 'seconds' in timestamp) {
+    return new Date(timestamp.seconds * 1000);
+  }
+  
+  // Handle date string or number
+  return new Date(timestamp);
+};
+
 export function EventProvider({ children }: { children: React.ReactNode }) {
   const { currentUser } = useAuth();
   const { currentOrganization } = useOrganization();
@@ -51,16 +74,37 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
         ))
       ]);
 
+      // Debug the first event's data
+      if (privateEvents.docs.length > 0) {
+        const sampleData = privateEvents.docs[0].data();
+        console.log('Sample event data:', {
+          start: sampleData.start,
+          startType: typeof sampleData.start,
+          startProps: Object.keys(sampleData.start || {}),
+          end: sampleData.end,
+          endType: typeof sampleData.end,
+          endProps: Object.keys(sampleData.end || {})
+        });
+      }
+
       const loadedEvents: Event[] = [
         ...privateEvents.docs.map(doc => {
           const data = doc.data();
+          // Debug each event's start date
+          console.log(`Event ${doc.id} start:`, {
+            raw: data.start,
+            type: typeof data.start,
+            isTimestamp: data.start instanceof Timestamp,
+            hasSeconds: typeof data.start === 'object' && 'seconds' in data.start
+          });
+
           return {
             id: doc.id,
             source: 'events' as const,
             title: data.title || '',
             description: data.description || '',
-            start: data.start instanceof Timestamp ? data.start.toDate() : new Date(data.start),
-            end: data.end instanceof Timestamp ? data.end.toDate() : data.end ? new Date(data.end) : undefined,
+            start: convertTimestamp(data.start),
+            end: convertTimestamp(data.end),
             timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
             organizationId: data.organizationId,
             owner: data.owner,
@@ -84,8 +128,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
                 order: w.order || 0
               }
             ).filter(w => w.isEnabled !== false) : [],
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
-            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
+            createdAt: convertTimestamp(data.createdAt),
+            updatedAt: convertTimestamp(data.updatedAt),
             photo: data.photo || null,
             phoneNumber: data.phoneNumber || null,
             website: data.website || null,
@@ -104,8 +148,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
             source: 'publicEvents' as const,
             title: data.title || '',
             description: data.description || '',
-            start: data.start instanceof Timestamp ? data.start.toDate() : new Date(data.start),
-            end: data.end instanceof Timestamp ? data.end.toDate() : data.end ? new Date(data.end) : undefined,
+            start: convertTimestamp(data.start),
+            end: convertTimestamp(data.end),
             timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
             organizationId: data.organizationId || currentOrganization.id,
             owner: data.owner || currentOrganization.id,
@@ -129,8 +173,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
                 order: w.order || 0
               }
             ).filter(w => w.isEnabled !== false) : [],
-            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
-            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
+            createdAt: convertTimestamp(data.createdAt),
+            updatedAt: convertTimestamp(data.updatedAt),
             photo: data.photo || null,
             phoneNumber: data.phoneNumber || null,
             website: data.website || null,
