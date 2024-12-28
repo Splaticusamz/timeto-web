@@ -13,13 +13,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider>
       <AuthProvider>
-        <OrganizationProvider>
-          <EventProvider>
-            <MemberProvider>
-              <RouterProvider router={router} />
-            </MemberProvider>
-          </EventProvider>
-        </OrganizationProvider>
+        <RouterProvider router={router} />
       </AuthProvider>
     </ThemeProvider>
   </React.StrictMode>,

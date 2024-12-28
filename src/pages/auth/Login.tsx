@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -6,15 +6,24 @@ export function Login() {
   const [email, setEmail] = useState('samz@timeto.gg');
   const [password, setPassword] = useState('test123');
   const [error, setError] = useState('');
-  const { signIn } = useAuth();
+  const { signIn, currentUser } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (currentUser) {
+      console.log('[Login] User detected, navigating...');
+      navigate('/');
+    }
+  }, [currentUser, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[Login] Attempting sign in...');
     try {
       await signIn(email, password);
-      navigate('/');
+      console.log('[Login] Sign in successful');
     } catch (err) {
+      console.log('[Login] Sign in failed:', err);
       setError('Failed to sign in');
       console.error(err);
     }

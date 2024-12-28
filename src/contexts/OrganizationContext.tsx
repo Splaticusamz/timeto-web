@@ -3,6 +3,7 @@ import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, Time
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
 import { Organization, CreateOrganizationData, OrgMemberRole, UserRoles } from '../types/organization';
+import { useNavigate } from 'react-router-dom';
 
 interface OrganizationWithEventCount extends Organization {
   eventCount: number;
@@ -41,6 +42,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
 
   // Load user roles
   useEffect(() => {
@@ -152,9 +154,9 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
           const lastOrg = orgsWithCounts.find(org => org.id === lastSelectedOrgId);
           if (lastOrg) {
             setCurrentOrganization(lastOrg);
-            // Navigate to the last path if we're at the root
+            // Use React Router navigation instead of window.location
             if (lastPath && window.location.pathname === '/') {
-              window.location.href = lastPath;
+              navigate(lastPath);
             }
             return;
           }
@@ -172,8 +174,10 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    loadUserOrganizations();
-  }, [currentUser, userRoles]);
+    if (currentUser) {
+      loadUserOrganizations();
+    }
+  }, [currentUser, navigate]);
 
   const createOrganization = async (data: CreateOrganizationData): Promise<OrganizationWithEventCount> => {
     if (!currentUser || !userRoles) throw new Error('User must be authenticated');
