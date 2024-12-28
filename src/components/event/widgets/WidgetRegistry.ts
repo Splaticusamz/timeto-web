@@ -34,13 +34,11 @@ const widgetRegistry: Record<Widget['type'], WidgetDefinition> = {
         maxPhotos: {
           type: 'number',
           title: 'Maximum Photos',
-          description: 'Maximum number of photos allowed',
           default: 10,
         },
         allowComments: {
           type: 'boolean',
           title: 'Allow Comments',
-          description: 'Allow users to comment on photos',
           default: true,
         },
         layout: {
@@ -90,31 +88,18 @@ const widgetRegistry: Record<Widget['type'], WidgetDefinition> = {
     name: 'Message Board',
     description: 'Allow attendees to post messages and updates',
     defaultConfig: {
-      allowReplies: true,
-      moderationEnabled: false,
-      sortOrder: 'newest',
+      messages: [],
     },
     configSchema: {
       type: 'object',
       properties: {
-        allowReplies: {
-          type: 'boolean',
-          title: 'Allow Replies',
-          default: true,
-        },
-        moderationEnabled: {
-          type: 'boolean',
-          title: 'Enable Moderation',
-          default: false,
-        },
-        sortOrder: {
-          type: 'string',
-          title: 'Sort Order',
-          enum: ['newest', 'oldest', 'popular'],
-          default: 'newest',
+        messages: {
+          type: 'array',
+          title: 'Messages',
+          default: [],
         },
       },
-      required: ['allowReplies', 'moderationEnabled', 'sortOrder'],
+      required: ['messages'],
     },
   },
   comments: {
@@ -148,99 +133,26 @@ const widgetRegistry: Record<Widget['type'], WidgetDefinition> = {
       required: ['allowReplies', 'moderationEnabled', 'allowRatings'],
     },
   },
-  attendees: {
-    type: 'attendees',
-    name: 'Attendees',
-    description: 'Show list of event attendees',
-    defaultConfig: {
-      showCount: true,
-      showList: true,
-      privacyLevel: 'name-only',
-    },
-    configSchema: {
-      type: 'object',
-      properties: {
-        showCount: {
-          type: 'boolean',
-          title: 'Show Count',
-          default: true,
-        },
-        showList: {
-          type: 'boolean',
-          title: 'Show List',
-          default: true,
-        },
-        privacyLevel: {
-          type: 'string',
-          title: 'Privacy Level',
-          enum: ['name-only', 'name-photo', 'full-profile'],
-          default: 'name-only',
-        },
-      },
-      required: ['showCount', 'showList', 'privacyLevel'],
-    },
-  },
   quickInfo: {
     type: 'quickInfo',
     name: 'Quick Info',
-    description: 'Display key event information at a glance',
-    defaultConfig: {
-      showTime: true,
-      showLocation: true,
-      showOrganizer: true,
-    },
+    description: 'Display key event information',
+    defaultConfig: {},
     configSchema: {
       type: 'object',
-      properties: {
-        showTime: {
-          type: 'boolean',
-          title: 'Show Time',
-          default: true,
-        },
-        showLocation: {
-          type: 'boolean',
-          title: 'Show Location',
-          default: true,
-        },
-        showOrganizer: {
-          type: 'boolean',
-          title: 'Show Organizer',
-          default: true,
-        },
-      },
-      required: ['showTime', 'showLocation', 'showOrganizer'],
+      properties: {},
+      required: [],
     },
   },
   weather: {
     type: 'weather',
     name: 'Weather',
     description: 'Show weather forecast for the event',
-    defaultConfig: {
-      showForecast: true,
-      unit: 'celsius',
-      daysAhead: 7,
-    },
+    defaultConfig: {},
     configSchema: {
       type: 'object',
-      properties: {
-        showForecast: {
-          type: 'boolean',
-          title: 'Show Forecast',
-          default: true,
-        },
-        unit: {
-          type: 'string',
-          title: 'Temperature Unit',
-          enum: ['celsius', 'fahrenheit'],
-          default: 'celsius',
-        },
-        daysAhead: {
-          type: 'number',
-          title: 'Days Ahead',
-          default: 7,
-        },
-      },
-      required: ['showForecast', 'unit', 'daysAhead'],
+      properties: {},
+      required: [],
     },
   },
   website: {
@@ -248,24 +160,30 @@ const widgetRegistry: Record<Widget['type'], WidgetDefinition> = {
     name: 'Website',
     description: 'Link to event website or related resources',
     defaultConfig: {
-      showPreview: true,
-      openInNewTab: true,
+      useOrganizationWebsite: false,
+      customUrl: '',
+      organizationWebsite: '',
     },
     configSchema: {
       type: 'object',
       properties: {
-        showPreview: {
+        useOrganizationWebsite: {
           type: 'boolean',
-          title: 'Show Preview',
-          default: true,
+          title: 'Use Organization Website',
+          default: false,
         },
-        openInNewTab: {
-          type: 'boolean',
-          title: 'Open in New Tab',
-          default: true,
+        customUrl: {
+          type: 'string',
+          title: 'Custom URL',
+          default: '',
+        },
+        organizationWebsite: {
+          type: 'string',
+          title: 'Organization Website',
+          default: '',
         },
       },
-      required: ['showPreview', 'openInNewTab'],
+      required: ['useOrganizationWebsite', 'customUrl', 'organizationWebsite'],
     },
   },
   call: {
@@ -273,24 +191,30 @@ const widgetRegistry: Record<Widget['type'], WidgetDefinition> = {
     name: 'Call',
     description: 'Display contact information for calls',
     defaultConfig: {
-      showNumber: true,
-      allowDirectCall: true,
+      useOrganizationPhone: false,
+      customPhone: '',
+      organizationPhone: '',
     },
     configSchema: {
       type: 'object',
       properties: {
-        showNumber: {
+        useOrganizationPhone: {
           type: 'boolean',
-          title: 'Show Number',
-          default: true,
+          title: 'Use Organization Phone',
+          default: false,
         },
-        allowDirectCall: {
-          type: 'boolean',
-          title: 'Allow Direct Call',
-          default: true,
+        customPhone: {
+          type: 'string',
+          title: 'Custom Phone',
+          default: '',
+        },
+        organizationPhone: {
+          type: 'string',
+          title: 'Organization Phone',
+          default: '',
         },
       },
-      required: ['showNumber', 'allowDirectCall'],
+      required: ['useOrganizationPhone', 'customPhone', 'organizationPhone'],
     },
   },
 };

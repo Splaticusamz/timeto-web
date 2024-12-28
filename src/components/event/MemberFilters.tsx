@@ -25,7 +25,7 @@ export function MemberFilters({
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Search members..."
-          className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+          className="block w-full px-4 py-2 rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm placeholder-gray-400 dark:placeholder-gray-500"
         />
       </div>
       

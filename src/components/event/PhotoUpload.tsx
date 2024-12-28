@@ -1,19 +1,21 @@
 import { PhotoIcon } from '@heroicons/react/24/outline';
 
 interface PhotoUploadProps {
-  photo?: string;
-  onPhotoChange: (photo: string) => void;
+  photo?: string | null;
+  onPhotoChange: (file: File | null) => Promise<void>;
+  isUploading: boolean;
 }
 
-export function PhotoUpload({ photo, onPhotoChange }: PhotoUploadProps) {
+export function PhotoUpload({ photo, onPhotoChange, isUploading }: PhotoUploadProps) {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Here you would typically upload to your storage service
-      // For now, we'll just create a local URL
-      const url = URL.createObjectURL(file);
-      onPhotoChange(url);
+      await onPhotoChange(file);
     }
+  };
+
+  const handleRemove = async () => {
+    await onPhotoChange(null);
   };
 
   return (
@@ -30,7 +32,7 @@ export function PhotoUpload({ photo, onPhotoChange }: PhotoUploadProps) {
             className="w-full h-48 object-cover rounded-lg"
           />
           <button
-            onClick={() => onPhotoChange('')}
+            onClick={handleRemove}
             className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full hover:bg-red-700"
           >
             Remove
@@ -48,10 +50,16 @@ export function PhotoUpload({ photo, onPhotoChange }: PhotoUploadProps) {
                   className="sr-only"
                   accept="image/*"
                   onChange={handleFileChange}
+                  disabled={isUploading}
                 />
               </label>
             </div>
             <p className="text-xs text-gray-500">PNG, JPG up to 10MB</p>
+            {isUploading && (
+              <div className="mt-2">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -3,6 +3,31 @@ import { EventVisibility, LocationType, EventLocation, RecurrenceRule } from '..
 import { format } from 'date-fns';
 import { Switch } from '@headlessui/react';
 import { formClasses } from '../../styles/forms';
+import { useOrganization } from '../../contexts/OrganizationContext';
+
+// Helper function to format date for datetime-local input
+function formatDateForInput(date: Date | string | undefined): string {
+  if (!date) return '';
+  try {
+    const dateObj = date instanceof Date ? date : new Date(date);
+    if (isNaN(dateObj.getTime())) return '';
+    return format(dateObj, "yyyy-MM-dd'T'HH:mm");
+  } catch (e) {
+    console.error('Error formatting date for input:', e);
+    return '';
+  }
+}
+
+// Helper function to parse date from input
+function parseDateFromInput(value: string): Date | undefined {
+  try {
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? undefined : date;
+  } catch (e) {
+    console.error('Error parsing date from input:', e);
+    return undefined;
+  }
+}
 
 interface BasicInfoFormProps {
   data: {
@@ -34,6 +59,7 @@ const COMMON_TIMEZONES = [
 
 export function BasicInfoForm({ data, onChange }: BasicInfoFormProps) {
   const [showRecurrence, setShowRecurrence] = useState(!!data.recurrence);
+  const { currentOrganization } = useOrganization();
 
   const handleChange = (field: keyof BasicInfoFormProps['data'], value: any) => {
     onChange({
@@ -42,63 +68,203 @@ export function BasicInfoForm({ data, onChange }: BasicInfoFormProps) {
     });
   };
 
+  const locationTypes = [
+    ...(currentOrganization?.address ? [{ value: 'organization', label: 'Organization Location' }] : []),
+    { value: 'fixed', label: 'Fixed Location' },
+    { value: 'virtual', label: 'Virtual Meeting' },
+    { value: 'hybrid', label: 'Hybrid' },
+  ];
+
+  const handleLocationTypeChange = (type: LocationType) => {
+    const newLocation: EventLocation = {
+      type,
+      address: type === 'organization' ? '' : data.location.address || '',
+      meetingUrl: ['virtual', 'hybrid'].includes(type) ? data.location.meetingUrl || '' : '',
+      meetingId: ['virtual', 'hybrid'].includes(type) ? data.location.meetingId || '' : '',
+      meetingPassword: ['virtual', 'hybrid'].includes(type) ? data.location.meetingPassword || '' : '',
+      meetingProvider: ['virtual', 'hybrid'].includes(type) ? data.location.meetingProvider || 'zoom' : undefined,
+    };
+    onChange({ ...data, location: newLocation });
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <label htmlFor="title" className={formClasses.label}>
+        <label className={formClasses.label}>
           Title
         </label>
         <input
           type="text"
-          id="title"
           value={data.title}
-          onChange={(e) => handleChange('title', e.target.value)}
+          onChange={(e) => onChange({ ...data, title: e.target.value })}
           className={formClasses.input}
-          placeholder="Enter event title"
         />
       </div>
 
       <div>
-        <label htmlFor="description" className={formClasses.label}>
+        <label className={formClasses.label}>
           Description
         </label>
         <textarea
-          id="description"
           value={data.description}
-          onChange={(e) => handleChange('description', e.target.value)}
-          rows={4}
+          onChange={(e) => onChange({ ...data, description: e.target.value })}
+          rows={3}
           className={formClasses.input}
-          placeholder="Describe your event"
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <label htmlFor="startDate" className={formClasses.label}>
+          <label className={formClasses.label}>
             Start Date & Time
           </label>
           <input
             type="datetime-local"
-            id="startDate"
-            value={format(data.startDate, "yyyy-MM-dd'T'HH:mm")}
-            onChange={(e) => handleChange('startDate', new Date(e.target.value))}
+            value={formatDateForInput(data.startDate)}
+            onChange={(e) => {
+              const date = parseDateFromInput(e.target.value);
+              if (date) {
+                onChange({ ...data, startDate: date });
+              }
+            }}
             className={formClasses.input}
           />
         </div>
 
         <div>
-          <label htmlFor="endDate" className={formClasses.label}>
+          <label className={formClasses.label}>
             End Date & Time (Optional)
           </label>
           <input
             type="datetime-local"
-            id="endDate"
-            value={data.endDate ? format(data.endDate, "yyyy-MM-dd'T'HH:mm") : ''}
-            onChange={(e) => handleChange('endDate', e.target.value ? new Date(e.target.value) : undefined)}
+            value={formatDateForInput(data.endDate)}
+            onChange={(e) => {
+              const date = parseDateFromInput(e.target.value);
+              onChange({ ...data, endDate: date });
+            }}
             className={formClasses.input}
           />
         </div>
       </div>
+
+      <div>
+        <label className={formClasses.label}>
+          Location Type
+        </label>
+        <select
+          value={data.location.type}
+          onChange={(e) => handleLocationTypeChange(e.target.value as LocationType)}
+          className={formClasses.select}
+        >
+          {locationTypes.map((type) => (
+            <option key={type.value} value={type.value}>
+              {type.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {data.location.type === 'fixed' && (
+        <div>
+          <label className={formClasses.label}>
+            Address
+          </label>
+          <input
+            type="text"
+            value={data.location.address}
+            onChange={(e) => onChange({
+              ...data,
+              location: { ...data.location, address: e.target.value }
+            })}
+            className={formClasses.input}
+          />
+        </div>
+      )}
+
+      {(data.location.type === 'virtual' || data.location.type === 'hybrid') && (
+        <div className="space-y-4">
+          <div>
+            <label className={formClasses.label}>
+              Meeting URL
+            </label>
+            <input
+              type="url"
+              value={data.location.meetingUrl}
+              onChange={(e) => onChange({
+                ...data,
+                location: { ...data.location, meetingUrl: e.target.value }
+              })}
+              className={formClasses.input}
+            />
+          </div>
+
+          <div>
+            <label className={formClasses.label}>
+              Meeting ID (Optional)
+            </label>
+            <input
+              type="text"
+              value={data.location.meetingId || ''}
+              onChange={(e) => onChange({
+                ...data,
+                location: { ...data.location, meetingId: e.target.value }
+              })}
+              className={formClasses.input}
+            />
+          </div>
+
+          <div>
+            <label className={formClasses.label}>
+              Meeting Password (Optional)
+            </label>
+            <input
+              type="text"
+              value={data.location.meetingPassword || ''}
+              onChange={(e) => onChange({
+                ...data,
+                location: { ...data.location, meetingPassword: e.target.value }
+              })}
+              className={formClasses.input}
+            />
+          </div>
+
+          <div>
+            <label className={formClasses.label}>
+              Meeting Provider
+            </label>
+            <select
+              value={data.location.meetingProvider || 'zoom'}
+              onChange={(e) => onChange({
+                ...data,
+                location: { ...data.location, meetingProvider: e.target.value }
+              })}
+              className={formClasses.select}
+            >
+              <option value="zoom">Zoom</option>
+              <option value="teams">Microsoft Teams</option>
+              <option value="meet">Google Meet</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {data.location.type === 'hybrid' && (
+        <div>
+          <label className={formClasses.label}>
+            Physical Location Address
+          </label>
+          <input
+            type="text"
+            value={data.location.address}
+            onChange={(e) => onChange({
+              ...data,
+              location: { ...data.location, address: e.target.value }
+            })}
+            className={formClasses.input}
+          />
+        </div>
+      )}
 
       <div>
         <label htmlFor="timezone" className={formClasses.label}>
@@ -226,54 +392,6 @@ export function BasicInfoForm({ data, onChange }: BasicInfoFormProps) {
           </div>
         )}
       </div>
-
-      <div>
-        <label htmlFor="locationType" className={formClasses.label}>
-          Location Type
-        </label>
-        <select
-          id="locationType"
-          value={data.location.type}
-          onChange={(e) => handleChange('location', { ...data.location, type: e.target.value as LocationType })}
-          className={formClasses.select}
-        >
-          <option value="fixed">Fixed Location</option>
-          <option value="virtual">Virtual</option>
-          <option value="hybrid">Hybrid</option>
-        </select>
-      </div>
-
-      {data.location.type !== 'virtual' && (
-        <div>
-          <label htmlFor="address" className={formClasses.label}>
-            Address
-          </label>
-          <input
-            type="text"
-            id="address"
-            value={data.location.address}
-            onChange={(e) => handleChange('location', { ...data.location, address: e.target.value })}
-            className={formClasses.input}
-            placeholder="Enter physical address"
-          />
-        </div>
-      )}
-
-      {data.location.type !== 'fixed' && (
-        <div>
-          <label htmlFor="meetingUrl" className={formClasses.label}>
-            Meeting URL
-          </label>
-          <input
-            type="url"
-            id="meetingUrl"
-            value={data.location.meetingUrl || ''}
-            onChange={(e) => handleChange('location', { ...data.location, meetingUrl: e.target.value })}
-            className={formClasses.input}
-            placeholder="Enter virtual meeting URL"
-          />
-        </div>
-      )}
 
       <div>
         <label htmlFor="visibility" className={formClasses.label}>

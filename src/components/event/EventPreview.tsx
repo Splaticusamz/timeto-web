@@ -25,9 +25,41 @@ import { useMember } from '../../contexts/MemberContext';
 interface EventPreviewProps {
   event: Event;
   isEditMode?: boolean;
+  isPreview?: boolean;
 }
 
-function AttendeeAvatar({ member }: { member: Member }) {
+function AttendeeAvatar({ member: { id } }: { member: { id: string } }) {
+  const { registeredMembers } = useMember();
+  const [member, setMember] = useState<any>(null);
+
+  useEffect(() => {
+    const loadMember = async () => {
+      try {
+        const foundMember = registeredMembers.find(m => m.id === id);
+        if (foundMember) {
+          setMember(foundMember);
+        } else {
+          // Fallback to showing first character of ID if member not found
+          setMember({ firstName: id.charAt(0).toUpperCase(), lastName: '' });
+        }
+      } catch (error) {
+        console.error('Failed to load member:', error);
+        setMember({ firstName: id.charAt(0).toUpperCase(), lastName: '' });
+      }
+    };
+    loadMember();
+  }, [id, registeredMembers]);
+
+  if (!member) {
+    return (
+      <div className="relative group cursor-pointer">
+        <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center ring-2 ring-white dark:ring-gray-800">
+          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">?</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="relative group cursor-pointer">
       <div className="h-8 w-8 transition-transform group-hover:scale-110">
@@ -41,6 +73,7 @@ function AttendeeAvatar({ member }: { member: Member }) {
           <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center ring-2 ring-white dark:ring-gray-800">
             <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
               {member.firstName ? member.firstName[0].toUpperCase() : '?'}
+              {member.lastName ? member.lastName[0].toUpperCase() : ''}
             </span>
           </div>
         )}
@@ -59,641 +92,333 @@ function AttendeeAvatar({ member }: { member: Member }) {
   );
 }
 
-export function EventPreview({ event, isEditMode = false }: EventPreviewProps) {
-  const [editingField, setEditingField] = useState<string | null>(null);
-  const { updateEvent } = useEvent();
-  const { registeredMembers, loadMembers } = useMember();
-  
-  // Load members when component mounts
-  useEffect(() => {
-    loadMembers(event.id);
-  }, [event.id, loadMembers]);
-
-  // Helper function to get member data
-  const getMemberData = (memberId: string) => {
-    const member = registeredMembers.find(m => m.id === memberId);
-    console.log('Getting member data:', { memberId, found: !!member, member });
-    return member || {
-      id: memberId,
-      type: 'member' as const,
-      firstName: '',
-      lastName: '',
-      phoneNumber: '',
-      status: 'accepted' as const,
-      organizations: [],
-      photoUrl: ''
-    };
-  };
-
-  const EditButton = ({ field }: { field: string }) => (
-    <button
-      onClick={() => setEditingField(field)}
-      className="ml-2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
-    >
-      <PencilIcon className="h-4 w-4" />
-    </button>
-  );
-
-  const renderField = (field: string, value: string, label: string) => (
-    <div>
-      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-        {label}
-        {isEditMode && editingField !== field && <EditButton field={field} />}
-      </dt>
-      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-        {editingField === field ? (
-          <div className="flex items-center space-x-2">
-            <input
-              type="text"
-              value={value}
-              onChange={(e) => {
-                // Handle change
-              }}
-              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-            />
-            <button
-              onClick={() => {
-                setEditingField(null);
-              }}
-              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          value
-        )}
-      </dd>
-    </div>
-  );
-
-  const renderTextField = (field: string, value: string, label: string) => (
-    <div>
-      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-        {label}
-        {isEditMode && editingField !== field && <EditButton field={field} />}
-      </dt>
-      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-        {editingField === field ? (
-          <div className="flex items-center space-x-2">
-            {field === 'description' ? (
-              <textarea
-                value={value}
-                rows={4}
-                onChange={(e) => {
-                  // Handle change
-                }}
-                className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
-              />
-            ) : (
-              <input
-                type="text"
-                value={value}
-                onChange={(e) => {
-                  // Handle change
-                }}
-                className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
-              />
-            )}
-            <button
-              onClick={() => {
-                setEditingField(null);
-              }}
-              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          <div className={field === 'description' ? 'whitespace-pre-wrap' : ''}>
-            {value}
-          </div>
-        )}
-      </dd>
-    </div>
-  );
-
-  const renderDateField = (field: string, value: Date, label: string) => (
-    <div>
-      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-        {label}
-        {isEditMode && editingField !== field && <EditButton field={field} />}
-      </dt>
-      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-        {editingField === field ? (
-          <div className="flex items-center space-x-2">
-            <input
-              type="date"
-              value={value.toISOString().split('T')[0]}
-              onChange={(e) => {
-                // Handle change
-              }}
-              className="block rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
-            />
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          formatDateOnly(value)
-        )}
-      </dd>
-    </div>
-  );
-
-  const renderTimeField = (field: string, value: Date, label: string) => (
-    <div>
-      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-        {label}
-        {isEditMode && editingField !== field && <EditButton field={field} />}
-      </dt>
-      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-        {editingField === field ? (
-          <div className="flex items-center space-x-2">
-            <input
-              type="time"
-              value={format(value, 'HH:mm')}
-              onChange={(e) => {
-                // Handle change
-              }}
-              className="block rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
-            />
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          formatTime(value)
-        )}
-      </dd>
-    </div>
-  );
-
-  const renderDropdownField = (
-    field: string, 
-    value: string, 
-    label: string, 
-    options: { label: string; value: string }[]
-  ) => (
-    <div>
-      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-        {label}
-        {isEditMode && editingField !== field && <EditButton field={field} />}
-      </dt>
-      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-        {editingField === field ? (
-          <div className="flex items-center space-x-2">
-            <select
-              value={value}
-              onChange={(e) => {
-                // Handle change
-              }}
-              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
-            >
-              {options.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          options.find(o => o.value === value)?.label || value
-        )}
-      </dd>
-    </div>
-  );
-
-  const renderLocationField = (field: string, value: EventLocation, label: string) => (
-    <div>
-      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center">
-        {label}
-        {isEditMode && editingField !== field && <EditButton field={field} />}
-      </dt>
-      <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
-        {editingField === field ? (
-          <div className="flex items-center space-x-2">
-            <input
-              type="text"
-              value={value.address || ''}
-              onChange={(e) => {
-                // Handle change
-              }}
-              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-2 py-2"
-            />
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          formatLocation()
-        )}
-      </dd>
-    </div>
-  );
-
-  const renderImageField = (field: string, value: string | undefined, label: string) => (
-    <div>
-      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 pb-2 border-b border-gray-200 dark:border-gray-700 mb-4">
-        {label}
-      </h3>
-      <dd className="mt-1">
-        {editingField === field ? (
-          <div className="flex items-center space-x-2">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                // Handle image upload
-              }}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
-            />
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => setEditingField(null)}
-              className="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-          </div>
-        ) : (
-          value ? (
-            <div className={`relative overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 ${
-              field === 'coverImage' ? 'h-64 w-full' : 'h-32 w-32'
-            }`}>
-              <img
-                src={value}
-                alt={label}
-                className="h-full w-full object-cover"
-              />
-              {isEditMode && (
-                <button
-                  onClick={() => setEditingField(field)}
-                  className="absolute top-2 right-2 p-1 bg-white dark:bg-gray-800 rounded-full shadow hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  <PencilIcon className="h-4 w-4 text-gray-600 dark:text-gray-300" />
-                </button>
-              )}
-            </div>
-          ) : isEditMode ? (
-            <button
-              onClick={() => setEditingField(field)}
-              className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-gray-400 dark:hover:border-gray-500"
-            >
-              <PhotoIcon className="h-8 w-8 text-gray-400" />
-            </button>
-          ) : null
-        )}
-      </dd>
-    </div>
-  );
-
+export function EventPreview({ event, isPreview = false }: EventPreviewProps) {
   const formatLocation = () => {
     switch (event.location.type) {
+      case 'organization':
+        return 'Organization Location';
       case 'virtual':
         return 'Virtual Event';
-      case 'multiple':
-        return `Multiple Locations: ${event.location.multipleLocations?.join(', ')}`;
+      case 'hybrid':
+        return `Hybrid: ${event.location.address} & Virtual`;
       case 'fixed':
         return event.location.address || 'Location TBD';
-      case 'tbd':
-        return 'Location TBD';
       default:
         return event.location.address || 'Location not specified';
     }
   };
 
-  const formatRecurrence = () => {
-    if (!event.recurrence) return 'One-time event';
-
-    const { frequency, interval } = event.recurrence;
-    const intervalText = interval > 1 ? `${interval} ` : '';
-    const frequencyText = frequency === 'daily' ? 'days' :
-                         frequency === 'weekly' ? 'weeks' :
-                         'months';
-
-    return `Repeats every ${intervalText}${frequencyText}`;
-  };
-
-  const formatTime = (date: Date | string | undefined) => {
-    if (!date) return 'N/A';
+  const formatDate = (date: Date | string | { seconds: number; nanoseconds: number } | undefined, formatStr: string): string => {
+    if (!date) return 'Not specified';
     try {
-      const dateObj = date instanceof Date ? date : new Date(date);
-      if (isNaN(dateObj.getTime())) return 'Invalid Date';
-      return format(dateObj, 'h:mm a');
+      // Log the raw input
+      console.log('Raw date input:', {
+        date,
+        type: typeof date,
+        isDate: date instanceof Date,
+        isTimestamp: typeof date === 'object' && 'seconds' in date,
+        dateValue: date instanceof Date ? date.toISOString() : date
+      });
+      
+      let dateObj: Date;
+      
+      // Handle Firestore Timestamp
+      if (typeof date === 'object' && 'seconds' in date && typeof date.seconds === 'number') {
+        dateObj = new Date(date.seconds * 1000);
+        console.log('Converted Timestamp to Date:', dateObj.toISOString());
+      }
+      // Handle Date object
+      else if (date instanceof Date) {
+        dateObj = date;
+        console.log('Using existing Date object:', dateObj.toISOString());
+      }
+      // Handle string
+      else if (typeof date === 'string') {
+        dateObj = new Date(date);
+        console.log('Converted string to Date:', dateObj.toISOString());
+      }
+      // Handle unknown format
+      else {
+        console.error('Unhandled date format:', date);
+        return 'Invalid date format';
+      }
+
+      if (isNaN(dateObj.getTime())) {
+        console.error('Invalid date:', { input: date, converted: dateObj });
+        return 'Invalid date';
+      }
+
+      const formatted = format(dateObj, formatStr);
+      console.log('Successfully formatted date:', formatted);
+      return formatted;
     } catch (e) {
-      return 'Invalid Date';
+      console.error('Error formatting date:', e);
+      return 'Invalid date';
     }
   };
 
-  const formatDateOnly = (date: Date | string | undefined) => {
-    if (!date) return 'N/A';
-    try {
-      const dateObj = date instanceof Date ? date : new Date(date);
-      if (isNaN(dateObj.getTime())) return 'Invalid Date';
-      return format(dateObj, 'MMMM d, yyyy');
-    } catch (e) {
-      return 'Invalid Date';
-    }
-  };
-
-  type WidgetType = Widget['type'];
-  
-  const getWidgetIcon = (type: Widget['type'], isEnabled: boolean) => {
-    const icons: Record<string, typeof CloudIcon> = {
-      description: InformationCircleIcon,
-      weather: CloudIcon,
-      location: MapPinIcon,
-      website: GlobeAltIcon,
-      phoneNumber: PhoneIcon,
+  const getWidgetIcon = (type: string) => {
+    const icons: Record<string, any> = {
       photos: PhotoIcon,
+      location: MapPinIcon,
       messageBoard: ChatBubbleLeftIcon,
       comments: ChatBubbleBottomCenterTextIcon,
       quickInfo: InformationCircleIcon,
+      weather: CloudIcon,
+      website: GlobeAltIcon,
       call: PhoneIcon,
     };
-    
-    const Icon = icons[type] || QuestionMarkCircleIcon;
-    return <Icon className={`h-6 w-6 mr-3 ${
-      isEnabled
-        ? 'text-green-700 dark:text-green-300'
-        : 'text-red-700 dark:text-red-300'
-    }`} />;
+    return icons[type] || null;
   };
 
-  const getWidgetName = (type: Widget['type']) => {
-    const names: Record<string, string> = {
-      description: 'Description',
-      weather: 'Weather',
-      location: 'Location',
-      website: 'Website',
-      phoneNumber: 'Phone',
-      photos: 'Photos',
-      messageBoard: 'Message Board',
-      comments: 'Comments',
-      quickInfo: 'Quick Info',
-      call: 'Call',
-    };
-    
-    return names[type] || type;
-  };
+  // For debugging
+  console.log('Event data:', {
+    start: event.start,
+    type: typeof event.start,
+    isTimestamp: typeof event.start === 'object' && 'seconds' in event.start
+  });
 
-  const getWidgetStatus = (widgetType: Widget['type']) => {
-    // Check if the widget type exists in the event widgets array
-    return event.widgets?.some(widget => 
-      typeof widget === 'object' && widget.type === widgetType
-    );
-  };
-
-  // Keep the exact names from the database for the enabled widgets
-  const availableWidgets: Widget['type'][] = [
-    'description',
-    'weather',
-    'location',
-    'photos',
-    'website',
-    'phoneNumber',
-    'messageBoard',
-    'comments',
-    'quickInfo',
-    'call',
-  ];
-
-  const renderAttendees = () => {
-    // Get attendees from event document
-    const attendeesList = Array.isArray(event?.attendees) ? event.attendees : [];
-    const acceptedList = Array.isArray(event?.accepted) ? event.accepted : [];
-    const declinedList = Array.isArray(event?.declined) ? event.declined : [];
-    const undecidedList = Array.isArray(event?.undecided) ? event.undecided : [];
-
-    // Debug logs
-    console.log('Raw event data:', event);
-    console.log('Event attendees arrays:', {
-      attendeesList,
-      acceptedList,
-      declinedList,
-      undecidedList
-    });
-
-    // Get member details for each attendee
-    const attendeeMembers = attendeesList.map(id => registeredMembers.find(m => m.id === id)).filter(Boolean);
-    const acceptedMembers = acceptedList.map(id => registeredMembers.find(m => m.id === id)).filter(Boolean);
-    const undecidedMembers = undecidedList.map(id => registeredMembers.find(m => m.id === id)).filter(Boolean);
-
-    console.log('Mapped member details:', {
-      attendeeMembers,
-      acceptedMembers,
-      undecidedMembers
-    });
-
-    return (
-      <div>
-        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">
-          Attendees
-        </dt>
-        <dd className="mt-2 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <div className="space-y-4">
-            {/* Accepted attendees */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
-                <span>Attending</span>
-                <span className="text-xs text-gray-500">({acceptedList.length})</span>
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {acceptedList.map((attendeeId) => (
-                  <AttendeeAvatar key={attendeeId} member={getMemberData(attendeeId)} />
-                ))}
-              </div>
+  return (
+    <div className="space-y-8">
+      {/* Images section at the top */}
+      <div className="flex gap-4">
+        <div className="w-64 flex-shrink-0">
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Event Photo</h4>
+            <div className="relative w-full h-64 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10">
+              {event.photo ? (
+                <img
+                  src={event.photo}
+                  alt="Event Photo"
+                  className="w-full h-full object-cover"
+                  crossOrigin="anonymous"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                  <span className="text-sm">No photo uploaded</span>
+                </div>
+              )}
             </div>
-
-            {/* Maybe/Undecided attendees */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
-                <span>Maybe</span>
-                <span className="text-xs text-gray-500">({undecidedList.length})</span>
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {undecidedList.map((attendeeId) => (
-                  <AttendeeAvatar key={attendeeId} member={getMemberData(attendeeId)} />
-                ))}
-              </div>
+          </div>
+        </div>
+        <div className="flex-1">
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Cover Image</h4>
+            <div className="relative w-full h-64 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10">
+              {event.coverImage ? (
+                <img
+                  src={event.coverImage}
+                  alt="Event Cover"
+                  className="w-full h-full object-cover"
+                  crossOrigin="anonymous"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                  <span className="text-sm">No cover image uploaded</span>
+                </div>
+              )}
             </div>
+          </div>
+        </div>
+      </div>
 
-            {/* Pending attendees */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
-                <span>Pending</span>
-                <span className="text-xs text-gray-500">({attendeesList.length})</span>
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {attendeesList.map((attendeeId) => (
-                  <AttendeeAvatar key={attendeeId} member={getMemberData(attendeeId)} />
-                ))}
+      <div className="grid grid-cols-2 gap-8">
+        {/* Event Details */}
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Event Details</h3>
+            <dl className="mt-4 space-y-4">
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Title</dt>
+                <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{event.title}</dd>
               </div>
-            </div>
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Description</dt>
+                <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{event.description}</dd>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Date</dt>
+                <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                  {formatDate(event.start, 'MMMM d, yyyy')}
+                </dd>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Start Time</dt>
+                <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                  {formatDate(event.start, 'h:mm a')}
+                </dd>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">End Time</dt>
+                <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                  {formatDate(event.end, 'h:mm a')}
+                </dd>
+              </div>
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Location</dt>
+                <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                  {formatLocation()}
+                </dd>
+              </div>
+              {event.recurrence && (
+                <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Recurrence</dt>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                    {event.recurrence.frequency === 'daily' ? 'Daily' :
+                     event.recurrence.frequency === 'weekly' ? 'Weekly' :
+                     'Monthly'} (every {event.recurrence.interval} {event.recurrence.frequency === 'daily' ? 'days' :
+                                                                   event.recurrence.frequency === 'weekly' ? 'weeks' :
+                                                                   'months'})
+                  </dd>
+                </div>
+              )}
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Visibility</dt>
+                <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                  {event.visibility === 'organization' ? 'Organization Members' :
+                   event.visibility === 'invite-only' ? 'Invite Only' :
+                   'Public'}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
 
-            {/* Declined attendees */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
-                <span>Declined</span>
-                <span className="text-xs text-gray-500">({declinedList.length})</span>
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {declinedList.map((attendeeId) => (
-                  <AttendeeAvatar key={attendeeId} member={getMemberData(attendeeId)} />
-                ))}
-              </div>
+        {/* Widgets and Attendees Column */}
+        <div className="space-y-6">
+          {/* Widgets Section */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Widgets</h3>
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              {[
+                'photos',
+                'location',
+                'messageBoard',
+                'comments',
+                'quickInfo',
+                'weather',
+                'website',
+                'call'
+              ].map((widgetType) => {
+                const widget = Array.isArray(event.widgets) && event.widgets.find(w => w.type === widgetType);
+                const isEnabled = widget?.isEnabled ?? false;
+                const Icon = getWidgetIcon(widgetType);
+
+                return (
+                  <div
+                    key={widgetType}
+                    className={`h-[72px] p-4 rounded-lg border flex items-center justify-between ${
+                      isEnabled
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                        : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      {Icon && (
+                        <Icon 
+                          className={`h-5 w-5 ${
+                            isEnabled
+                              ? 'text-green-600 dark:text-green-400'
+                              : 'text-gray-400 dark:text-gray-500'
+                          }`}
+                        />
+                      )}
+                      <h4 className={`text-sm font-medium ${
+                        isEnabled
+                          ? 'text-green-900 dark:text-green-100'
+                          : 'text-gray-500 dark:text-gray-400'
+                      }`}>
+                        {widgetType === 'messageBoard' ? 'Message Board' :
+                         widgetType === 'quickInfo' ? 'Quick Info' :
+                         widgetType.charAt(0).toUpperCase() + widgetType.slice(1)}
+                      </h4>
+                    </div>
+                    <div className={`h-2 w-2 rounded-full ${
+                      isEnabled
+                        ? 'bg-green-500 dark:bg-green-400'
+                        : 'bg-gray-300 dark:bg-gray-600'
+                    }`} />
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          {(!attendeesList.length && !acceptedList.length && 
-            !declinedList.length && !undecidedList.length) && (
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              No attendees yet
-            </span>
-          )}
-        </dd>
-      </div>
-    );
-  };
+          {/* Attendees Section */}
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Attendees</h3>
+            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+              <div className="space-y-4">
+                {/* Accepted attendees */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                    <span>Attending</span>
+                    <span className="text-xs text-gray-500">({event.accepted?.length || 0})</span>
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {event.accepted?.length > 0 ? (
+                      event.accepted.map((memberId) => (
+                        <AttendeeAvatar key={memberId} member={{ id: memberId }} />
+                      ))
+                    ) : (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">No accepted members yet</span>
+                    )}
+                  </div>
+                </div>
 
-  return (
-    <div className="space-y-6">
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Left column - Event Details */}
-        <div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 pb-2 border-b border-gray-200 dark:border-gray-700">
-            Event Details
-          </h3>
-          <dl className="mt-4 space-y-4">
-            {renderTextField('title', event.title, 'Title')}
-            {renderTextField('description', event.description, 'Description')}
-            {renderDateField('date', event.start, 'Date')}
-            {renderTimeField('time', event.start, 'Time')}
-            {renderDropdownField('recurrence', 
-              event.recurrence?.frequency || 'none', 
-              'Recurrence',
-              [
-                { label: 'One-time event', value: 'none' },
-                { label: 'Daily', value: 'daily' },
-                { label: 'Weekly', value: 'weekly' },
-                { label: 'Monthly', value: 'monthly' }
-              ]
-            )}
-            {renderLocationField('location', event.location, 'Location')}
-            {event.phoneNumber && renderTextField('phoneNumber', event.phoneNumber, 'Phone')}
-            {event.website && renderTextField('website', event.website, 'Website')}
-            {renderDropdownField('visibility',
-              event.visibility,
-              'Visibility',
-              [
-                { label: 'Organization Members', value: 'organization' },
-                { label: 'Invite Only', value: 'invite-only' },
-                { label: 'Public', value: 'public' }
-              ]
-            )}
-            {renderAttendees()}
-          </dl>
-        </div>
+                {/* Maybe/Undecided attendees */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                    <span>Maybe</span>
+                    <span className="text-xs text-gray-500">({event.undecided?.length || 0})</span>
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {event.undecided?.length > 0 ? (
+                      event.undecided.map((memberId) => (
+                        <AttendeeAvatar key={memberId} member={{ id: memberId }} />
+                      ))
+                    ) : (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">No undecided members</span>
+                    )}
+                  </div>
+                </div>
 
-        {/* Right column - Images */}
-        <div className="space-y-6">
-          {renderImageField('coverImage', event.coverImage, 'Event Image')}
-          {renderImageField('logoImage', event.logoImage, 'Organization Logo')}
-        </div>
-      </div>
+                {/* Pending attendees */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                    <span>Pending</span>
+                    <span className="text-xs text-gray-500">({event.attendees?.length || 0})</span>
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {event.attendees?.length > 0 ? (
+                      event.attendees.map((memberId) => (
+                        <AttendeeAvatar key={memberId} member={{ id: memberId }} />
+                      ))
+                    ) : (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">No pending members</span>
+                    )}
+                  </div>
+                </div>
 
-      {/* Widgets */}
-      <div className="border-t pt-6">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Widgets</h3>
-        <div className="mt-4 grid grid-cols-2 gap-4">
-          {availableWidgets.map(widgetType => {
-            const isEnabled = getWidgetStatus(widgetType);
-            console.log('Widget Render:', {
-              widgetType,
-              isEnabled,
-              widgetsList: availableWidgets
-            });
-            
-            return (
-              <div 
-                key={widgetType}
-                className={`flex items-center p-4 rounded-lg border ${
-                  isEnabled 
-                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                }`}
-              >
-                {getWidgetIcon(widgetType, isEnabled)}
-                <div>
-                  <span className={`text-sm font-medium ${
-                    isEnabled
-                      ? 'text-green-700 dark:text-green-300'
-                      : 'text-red-700 dark:text-red-300'
-                  }`}>
-                    {getWidgetName(widgetType)}
-                  </span>
+                {/* Declined attendees */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                    <span>Declined</span>
+                    <span className="text-xs text-gray-500">({event.declined?.length || 0})</span>
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {event.declined?.length > 0 ? (
+                      event.declined.map((memberId) => (
+                        <AttendeeAvatar key={memberId} member={{ id: memberId }} />
+                      ))
+                    ) : (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">No declined members</span>
+                    )}
+                  </div>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          </div>
         </div>
       </div>
 

@@ -1,6 +1,18 @@
 import { useState } from 'react';
 import { Widget } from '../../../types/event';
-import { getWidgetDefinition } from './WidgetRegistry';
+import { getAllWidgetDefinitions, getWidgetDefinition } from './WidgetRegistry';
+import {
+  CloudIcon,
+  MapPinIcon,
+  GlobeAltIcon,
+  PhoneIcon,
+  PhotoIcon,
+  ChatBubbleLeftIcon,
+  ChatBubbleBottomCenterTextIcon,
+  InformationCircleIcon,
+  QuestionMarkCircleIcon,
+  CheckIcon,
+} from '@heroicons/react/24/outline';
 
 interface WidgetSelectorProps {
   selectedWidgets: Widget[];
@@ -8,79 +20,113 @@ interface WidgetSelectorProps {
 }
 
 export function WidgetSelector({ selectedWidgets, onWidgetsChange }: WidgetSelectorProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const handleWidgetToggle = (widgetId: string) => {
-    const isSelected = selectedWidgets.some(w => w.id === widgetId);
+  const handleWidgetToggle = (widgetType: Widget['type']) => {
+    const isSelected = selectedWidgets.some(w => w.type === widgetType);
     if (isSelected) {
-      onWidgetsChange(selectedWidgets.filter(w => w.id !== widgetId));
+      onWidgetsChange(selectedWidgets.filter(w => w.type !== widgetType));
     } else {
-      const definition = getWidgetDefinition(widgetId);
-      if (definition) {
-        onWidgetsChange([...selectedWidgets, {
-          id: widgetId,
-          isEnabled: true,
-          config: definition.defaultConfig || {},
-        }]);
+      // Special configuration for specific widgets
+      let config = {};
+      if (widgetType === 'website') {
+        config = {
+          useOrganizationWebsite: true,
+          customUrl: '',
+        };
+      } else if (widgetType === 'phoneNumber' || widgetType === 'call') {
+        config = {
+          useOrganizationPhone: true,
+          customPhone: '',
+        };
+      } else if (widgetType === 'messageBoard') {
+        config = {
+          messages: [],
+          newMessage: '',
+        };
       }
+
+      onWidgetsChange([...selectedWidgets, {
+        id: crypto.randomUUID(),
+        type: widgetType,
+        isEnabled: true,
+        config,
+      }]);
     }
   };
 
-  const availableWidgets = Object.values(getWidgetDefinition())
-    .filter(widget => 
-      widget.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      widget.description.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  const getWidgetIcon = (type: Widget['type']) => {
+    const icons: Record<string, typeof CloudIcon> = {
+      description: InformationCircleIcon,
+      weather: CloudIcon,
+      location: MapPinIcon,
+      website: GlobeAltIcon,
+      phoneNumber: PhoneIcon,
+      photos: PhotoIcon,
+      messageBoard: ChatBubbleLeftIcon,
+      comments: ChatBubbleBottomCenterTextIcon,
+      quickInfo: InformationCircleIcon,
+      call: PhoneIcon,
+    };
+    
+    const Icon = icons[type] || QuestionMarkCircleIcon;
+    return Icon;
+  };
+
+  const getWidgetName = (type: Widget['type']) => {
+    const names: Record<string, string> = {
+      description: 'Description',
+      weather: 'Weather',
+      location: 'Location',
+      website: 'Website',
+      phoneNumber: 'Phone',
+      photos: 'Photos',
+      messageBoard: 'Message Board',
+      comments: 'Comments',
+      quickInfo: 'Quick Info',
+      call: 'Call',
+    };
+    
+    return names[type] || type;
+  };
+
+  const availableWidgets = getAllWidgetDefinitions()
+    .filter(widget => widget.type !== 'attendees'); // Filter out attendees widget
 
   return (
-    <div className="space-y-4">
-      <div>
-        <label htmlFor="widget-search" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Search Widgets
-        </label>
-        <input
-          type="text"
-          id="widget-search"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search widgets..."
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600"
-        />
-      </div>
-
-      <div className="space-y-2">
-        {availableWidgets.map((widget) => {
-          const isSelected = selectedWidgets.some(w => w.id === widget.id);
-          return (
-            <div
-              key={widget.id}
-              className={`p-4 rounded-lg border ${
+    <div className="grid grid-cols-2 gap-4">
+      {availableWidgets.map((widget) => {
+        const isSelected = selectedWidgets.some(w => w.type === widget.type);
+        const Icon = getWidgetIcon(widget.type);
+        
+        return (
+          <div 
+            key={widget.type}
+            onClick={() => handleWidgetToggle(widget.type)}
+            className={`flex items-center p-4 rounded-lg border cursor-pointer ${
+              isSelected 
+                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+                : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+            }`}
+          >
+            <Icon className={`h-6 w-6 mr-3 ${
+              isSelected
+                ? 'text-green-700 dark:text-green-300'
+                : 'text-red-700 dark:text-red-300'
+            }`} />
+            <div className="flex-1">
+              <span className={`text-sm font-medium ${
                 isSelected
-                  ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                  : 'border-gray-200 dark:border-gray-700'
-              } cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800`}
-              onClick={() => handleWidgetToggle(widget.id)}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {widget.name}
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {widget.description}
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => handleWidgetToggle(widget.id)}
-                  className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-              </div>
+                  ? 'text-green-700 dark:text-green-300'
+                  : 'text-red-700 dark:text-red-300'
+              }`}>
+                {getWidgetName(widget.type)}
+              </span>
             </div>
-          );
-        })}
-      </div>
+            {isSelected && (
+              <CheckIcon className="h-5 w-5 text-green-700 dark:text-green-300" />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 } 

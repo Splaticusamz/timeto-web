@@ -174,32 +174,51 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       title: data.title,
       description: data.description,
       start: data.start,
-      end: data.end,
+      end: data.end || null, // Convert undefined to null for Firestore
       timezone: data.timezone,
       location: data.location,
       visibility: data.visibility,
-      widgets: data.widgets || [],
+      widgets: data.widgets.filter(w => w.isEnabled).map(w => w.type),
       createdAt: new Date(now),
       updatedAt: new Date(now),
-      owner: currentUser.uid,
+      owner: currentOrganization.id,
       organizationId: currentOrganization.id,
       status: data.status || 'draft',
-      photo: data.photo,
-      phoneNumber: data.phoneNumber,
-      website: data.website,
-      coverImage: data.coverImage,
-      logoImage: data.logoImage,
+      photo: data.photo || null,
+      phoneNumber: data.phoneNumber || null,
+      website: data.website || null,
+      coverImage: data.coverImage || null,
+      logoImage: data.logoImage || null,
+      attendees: [],
+      accepted: [],
+      declined: [],
+      undecided: [],
     };
 
     try {
       const eventsRef = collection(db, 'events');
       const docRef = doc(eventsRef);
-      await setDoc(docRef, { ...eventData, id: docRef.id });
+      const docData = {
+        ...eventData,
+        id: docRef.id,
+        // Convert dates to Firestore Timestamps
+        start: Timestamp.fromDate(data.start),
+        end: data.end ? Timestamp.fromDate(data.end) : null,
+        createdAt: Timestamp.fromDate(new Date(now)),
+        updatedAt: Timestamp.fromDate(new Date(now)),
+        // Add widget configs
+        widgetConfigs: data.widgets.filter(w => w.isEnabled).reduce((acc, w) => ({
+          ...acc,
+          [w.type]: w.config || {}
+        }), {}),
+      };
+      await setDoc(docRef, docData);
       
       const newEvent = { ...eventData, id: docRef.id };
       setEvents((prev) => [newEvent, ...prev]);
       return newEvent;
     } catch (err) {
+      console.error('Failed to create event:', err);
       throw new Error('Failed to create event');
     }
   }, [currentUser, currentOrganization]);

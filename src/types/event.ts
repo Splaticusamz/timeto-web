@@ -2,7 +2,7 @@ import { Timestamp } from 'firebase/firestore';
 
 export type EventVisibility = 'public' | 'organization' | 'invite-only';
 export type EventStatus = 'draft' | 'published' | 'cancelled';
-export type LocationType = 'fixed' | 'multiple' | 'virtual' | 'tbd';
+export type LocationType = 'organization' | 'fixed' | 'virtual' | 'hybrid';
 export type EventSource = 'events' | 'publicEvents';
 
 export interface EventLocation {
@@ -37,7 +37,7 @@ export interface Event {
   timezone?: string;
   location: EventLocation;
   visibility: 'organization' | 'invite-only' | 'public';
-  widgets: string[];
+  widgets: Widget[];
   createdAt: Date;
   updatedAt: Date;
   owner: string;

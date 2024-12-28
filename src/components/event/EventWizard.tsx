@@ -9,6 +9,8 @@ import { WidgetConfigForm } from './WidgetConfigForm';
 import { EventPreview } from './EventPreview';
 import { PhotoUpload } from './PhotoUpload';
 import { WidgetConfig } from './WidgetConfig';
+import { ImageUpload } from './ImageUpload';
+import { PhotoIcon } from '@heroicons/react/24/outline';
 
 type WizardStep = 'basic-info' | 'widgets' | 'publish';
 
@@ -62,6 +64,16 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
     widgets: event?.widgets || [],
   });
 
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [coverImageUploading, setCoverImageUploading] = useState(false);
+  const [logoImageUploading, setLogoImageUploading] = useState(false);
+
+  const [eventPhotos, setEventPhotos] = useState({
+    photo: event?.photo || null,
+    coverImage: event?.coverImage || null,
+    logoImage: event?.logoImage || null,
+  });
+
   useEffect(() => {
     // Auto-save draft every 30 seconds if editing an existing event
     if (!event?.id) return;
@@ -87,9 +99,152 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
     return () => clearInterval(interval);
   }, [event?.id, basicInfo, widgetConfig, currentOrganization?.id, saveDraft]);
 
+  const compressImage = async (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+
+        // Calculate new dimensions while maintaining aspect ratio
+        let width = img.width;
+        let height = img.height;
+        const maxDimension = 800; // Max width or height
+
+        if (width > height && width > maxDimension) {
+          height = (height * maxDimension) / width;
+          width = maxDimension;
+        } else if (height > maxDimension) {
+          width = (width * maxDimension) / height;
+          height = maxDimension;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to compress image'));
+            }
+          },
+          'image/jpeg',
+          0.7 // Quality (0.7 = 70% quality)
+        );
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+    });
+  };
+
+  const handlePhotoUpload = async (file: File | null) => {
+    try {
+      setPhotoUploading(true);
+      setError(null);
+    
+      if (file === null) {
+        setEventPhotos(prev => ({ ...prev, photo: null }));
+        if (event?.id) {
+          await updateEvent(event.id, {
+            ...event,
+            photo: null,
+          });
+        }
+        return;
+      }
+
+      // Compress the image
+      const compressedBlob = await compressImage(file);
+      const previewUrl = URL.createObjectURL(compressedBlob);
+      setEventPhotos(prev => ({ ...prev, photo: previewUrl }));
+
+      if (event?.id) {
+        await updateEvent(event.id, {
+          ...event,
+          photo: previewUrl,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to upload photo:', err);
+      setError('Failed to upload photo. Please try again.');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
+
+  const handleCoverImageUpload = async (file: File) => {
+    try {
+      setCoverImageUploading(true);
+      setError(null);
+      
+      // Compress the image
+      const compressedBlob = await compressImage(file);
+      const previewUrl = URL.createObjectURL(compressedBlob);
+      setEventPhotos(prev => ({ ...prev, coverImage: previewUrl }));
+
+      if (event?.id) {
+        await updateEvent(event.id, {
+          ...event,
+          coverImage: previewUrl,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to upload cover image:', err);
+      setError('Failed to upload cover image. Please try again.');
+    } finally {
+      setCoverImageUploading(false);
+    }
+  };
+
+  const handleLogoImageUpload = async (file: File) => {
+    try {
+      setLogoImageUploading(true);
+      setError(null);
+      
+      const previewUrl = URL.createObjectURL(file);
+      setEventPhotos(prev => ({ ...prev, logoImage: previewUrl }));
+
+      if (event?.id) {
+        await updateEvent(event.id, {
+          ...event,
+          logoImage: previewUrl,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to upload logo image:', err);
+      setError('Failed to upload logo image. Please try again.');
+    } finally {
+      setLogoImageUploading(false);
+    }
+  };
+
   const validateBasicInfo = (): boolean => {
-    if (!basicInfo.title || !basicInfo.startDate || !basicInfo.location) {
-      setError('Please fill in all required fields');
+    if (!basicInfo.title) {
+      setError('Please enter a title');
+      return false;
+    }
+    if (!basicInfo.startDate) {
+      setError('Please select a start date');
+      return false;
+    }
+    if (basicInfo.endDate && basicInfo.endDate < basicInfo.startDate) {
+      setError('End date must be after start date');
+      return false;
+    }
+    if (basicInfo.location.type !== 'virtual' && !basicInfo.location.address) {
+      setError('Please enter a location address');
+      return false;
+    }
+    if (basicInfo.location.type !== 'fixed' && !basicInfo.location.meetingUrl) {
+      setError('Please enter a meeting URL');
       return false;
     }
     return true;
@@ -101,24 +256,78 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
       setError('Please enable at least one widget');
       return false;
     }
+
+    // Check each enabled widget for required fields
+    for (const widget of widgetConfig.widgets) {
+      if (!widget.isEnabled) continue;
+
+      if (widget.type === 'website') {
+        if (widget.config.useOrganizationWebsite && !currentOrganization?.website) {
+          setError('Organization website is not available. Please enter a custom website.');
+          return false;
+        }
+        if (!widget.config.useOrganizationWebsite && !widget.config.customUrl) {
+          setError('Please enter a website URL');
+          return false;
+        }
+      }
+
+      if (widget.type === 'phoneNumber' || widget.type === 'call') {
+        if (widget.config.useOrganizationPhone && !currentOrganization?.phoneNumber) {
+          setError('Organization phone number is not available. Please enter a custom phone number.');
+          return false;
+        }
+        if (!widget.config.useOrganizationPhone && !widget.config.customPhone) {
+          setError('Please enter a phone number');
+          return false;
+        }
+      }
+
+      if (widget.type === 'messageBoard') {
+        if (!widget.config.messages || widget.config.messages.length === 0) {
+          setError('Please add at least one message to the message board');
+          return false;
+        }
+      }
+    }
+
     return true;
   };
 
   const handleNext = () => {
     if (currentStep === 'basic-info') {
       if (validateBasicInfo()) {
+        setError(null);
         setCurrentStep('widgets');
       }
     } else if (currentStep === 'widgets') {
       if (validateWidgets()) {
+        setError(null);
         setCurrentStep('publish');
       }
     }
   };
 
   const handleBack = () => {
+    setError(null);
     if (currentStep === 'publish') setCurrentStep('widgets');
     else if (currentStep === 'widgets') setCurrentStep('basic-info');
+  };
+
+  const blobToDataUrl = async (blobUrl: string): Promise<string> => {
+    try {
+      const response = await fetch(blobUrl);
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error converting blob to data URL:', error);
+      return blobUrl;
+    }
   };
 
   const handleSave = async (publish: boolean = false) => {
@@ -126,23 +335,144 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
       setSaving(true);
       setError(null);
 
-      if (!validateBasicInfo() || !validateWidgets()) {
+      // Validate all steps before publishing
+      if (!validateBasicInfo()) {
+        setCurrentStep('basic-info');
+        setSaving(false);
         return;
       }
 
+      if (!validateWidgets()) {
+        setCurrentStep('widgets');
+        setSaving(false);
+        return;
+      }
+
+      // Ensure we have an organization
+      if (!currentOrganization?.id) {
+        setError('No organization selected');
+        setSaving(false);
+        return;
+      }
+
+      // Convert blob URLs to compressed data URLs
+      let photoDataUrl = null;
+      let coverImageDataUrl = null;
+
+      if (eventPhotos.photo?.startsWith('blob:')) {
+        try {
+          const response = await fetch(eventPhotos.photo);
+          const blob = await response.blob();
+          const compressedBlob = await compressImage(new File([blob], 'photo.jpg', { type: 'image/jpeg' }));
+          photoDataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(compressedBlob);
+          });
+        } catch (error) {
+          console.error('Failed to convert photo blob to data URL:', error);
+        }
+      }
+
+      if (eventPhotos.coverImage?.startsWith('blob:')) {
+        try {
+          const response = await fetch(eventPhotos.coverImage);
+          const blob = await response.blob();
+          const compressedBlob = await compressImage(new File([blob], 'cover.jpg', { type: 'image/jpeg' }));
+          coverImageDataUrl = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(compressedBlob);
+          });
+        } catch (error) {
+          console.error('Failed to convert cover image blob to data URL:', error);
+        }
+      }
+
+      // Ensure dates are valid
+      const startDate = new Date(basicInfo.startDate);
+      if (isNaN(startDate.getTime())) {
+        setError('Invalid start date');
+        setCurrentStep('basic-info');
+        setSaving(false);
+        return;
+      }
+
+      let endDate: Date | undefined;
+      if (basicInfo.endDate) {
+        endDate = new Date(basicInfo.endDate);
+        if (isNaN(endDate.getTime())) {
+          setError('Invalid end date');
+          setCurrentStep('basic-info');
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Log the dates for debugging
+      console.log('Saving event with dates:', {
+        startInput: basicInfo.startDate,
+        startDate,
+        endInput: basicInfo.endDate,
+        endDate,
+        startValid: !isNaN(startDate.getTime()),
+        endValid: endDate ? !isNaN(endDate.getTime()) : true
+      });
+
       const eventData: CreateEventData = {
-        title: basicInfo.title,
-        description: basicInfo.description,
-        start: basicInfo.startDate,
-        end: basicInfo.endDate,
+        title: basicInfo.title.trim(),
+        description: basicInfo.description.trim(),
+        start: startDate,
+        end: endDate,
         timezone: basicInfo.timezone,
         location: basicInfo.location,
         visibility: basicInfo.visibility,
-        recurrence: basicInfo.recurrence,
-        widgets: widgetConfig.widgets,
+        recurrence: basicInfo.recurrence ? {
+          ...basicInfo.recurrence,
+          endDate: basicInfo.recurrence.endDate ? new Date(basicInfo.recurrence.endDate) : undefined
+        } : undefined,
+        widgets: widgetConfig.widgets
+          .filter(w => w.isEnabled)
+          .map(w => {
+            // Convert phoneNumber type to call
+            if (w.type === 'phoneNumber') {
+              return {
+                ...w,
+                type: 'call',
+                config: {
+                  useOrganizationPhone: w.config.useOrganizationPhone,
+                  customPhone: w.config.customPhone,
+                  organizationPhone: currentOrganization?.phoneNumber
+                }
+              };
+            }
+            // Clean up website widget
+            if (w.type === 'website') {
+              return {
+                ...w,
+                config: {
+                  useOrganizationWebsite: w.config.useOrganizationWebsite,
+                  customUrl: w.config.customUrl,
+                  organizationWebsite: currentOrganization?.website
+                }
+              };
+            }
+            // Clean up message board widget
+            if (w.type === 'messageBoard') {
+              return {
+                ...w,
+                config: {
+                  messages: w.config.messages || []
+                }
+              };
+            }
+            return w;
+          }),
         organizationId: currentOrganization?.id || '',
         status: publish ? 'published' : 'draft',
-        photo: event?.photo,
+        photo: photoDataUrl,
+        coverImage: coverImageDataUrl,
+        logoImage: eventPhotos.logoImage,
       };
 
       let savedEvent: Event;
@@ -175,18 +505,23 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
       start: currentEvent.start,
       end: currentEvent.end,
       startType: typeof currentEvent.start,
-      endType: typeof currentEvent.end
+      endType: typeof currentEvent.end,
+      isTimestamp: currentEvent.start && typeof currentEvent.start === 'object' && 'seconds' in currentEvent.start
     });
 
     // Ensure dates are properly formatted and handle potential invalid dates
     const formattedEvent = {
       ...currentEvent,
       start: (() => {
+        if (!currentEvent.start) return new Date();
+        if (typeof currentEvent.start === 'object' && 'seconds' in currentEvent.start) {
+          return new Date(currentEvent.start.seconds * 1000);
+        }
+        if (currentEvent.start instanceof Date) {
+          return currentEvent.start;
+        }
         try {
-          const date = currentEvent.start instanceof Date 
-            ? currentEvent.start 
-            : new Date(currentEvent.start);
-          // Check if date is valid
+          const date = new Date(currentEvent.start);
           return isNaN(date.getTime()) ? new Date() : date;
         } catch (e) {
           console.error('Error parsing start date:', e);
@@ -195,11 +530,14 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
       })(),
       end: (() => {
         if (!currentEvent.end) return undefined;
+        if (typeof currentEvent.end === 'object' && 'seconds' in currentEvent.end) {
+          return new Date(currentEvent.end.seconds * 1000);
+        }
+        if (currentEvent.end instanceof Date) {
+          return currentEvent.end;
+        }
         try {
-          const date = currentEvent.end instanceof Date 
-            ? currentEvent.end 
-            : new Date(currentEvent.end);
-          // Check if date is valid
+          const date = new Date(currentEvent.end);
           return isNaN(date.getTime()) ? undefined : date;
         } catch (e) {
           console.error('Error parsing end date:', e);
@@ -240,35 +578,61 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
     <div className="max-w-6xl mx-auto py-8 px-4">
       <div className="mb-8">
         <nav className="flex justify-center">
-          <ol className="flex items-center space-x-4">
-            <li className={`flex items-center ${currentStep === 'basic-info' ? 'text-primary-600' : 'text-gray-500'}`}>
-              <span className="rounded-full bg-primary-100 px-3 py-1 text-sm font-medium">1. Basic Info</span>
+          <ol className="flex items-center">
+            <li className="flex items-center">
+              <div className="flex items-center">
+                <span className={`w-8 h-8 flex items-center justify-center rounded-full border-2 ${
+                  currentStep === 'basic-info' 
+                    ? 'border-primary-600 text-primary-600' 
+                    : 'border-gray-300 text-gray-500'
+                }`}>
+                  1
+                </span>
+                <span className={`ml-2 text-sm font-medium ${
+                  currentStep === 'basic-info' ? 'text-primary-600' : 'text-gray-500'
+                }`}>
+                  Basic Info
+                </span>
+              </div>
+              <div className="mx-4 w-24 border-t border-gray-300"></div>
             </li>
-            <li className="flex-shrink-0">→</li>
-            <li className={`flex items-center ${currentStep === 'widgets' ? 'text-primary-600' : 'text-gray-500'}`}>
-              <span className="rounded-full bg-primary-100 px-3 py-1 text-sm font-medium">2. Widgets</span>
+
+            <li className="flex items-center">
+              <div className="flex items-center">
+                <span className={`w-8 h-8 flex items-center justify-center rounded-full border-2 ${
+                  currentStep === 'widgets' 
+                    ? 'border-primary-600 text-primary-600' 
+                    : 'border-gray-300 text-gray-500'
+                }`}>
+                  2
+                </span>
+                <span className={`ml-2 text-sm font-medium ${
+                  currentStep === 'widgets' ? 'text-primary-600' : 'text-gray-500'
+                }`}>
+                  Widgets
+                </span>
+              </div>
+              <div className="mx-4 w-24 border-t border-gray-300"></div>
             </li>
-            <li className="flex-shrink-0">→</li>
-            <li className={`flex items-center ${currentStep === 'publish' ? 'text-primary-600' : 'text-gray-500'}`}>
-              <span className="rounded-full bg-primary-100 px-3 py-1 text-sm font-medium">3. Publish</span>
+
+            <li className="flex items-center">
+              <div className="flex items-center">
+                <span className={`w-8 h-8 flex items-center justify-center rounded-full border-2 ${
+                  currentStep === 'publish' 
+                    ? 'border-primary-600 text-primary-600' 
+                    : 'border-gray-300 text-gray-500'
+                }`}>
+                  3
+                </span>
+                <span className={`ml-2 text-sm font-medium ${
+                  currentStep === 'publish' ? 'text-primary-600' : 'text-gray-500'
+                }`}>
+                  Publish
+                </span>
+              </div>
             </li>
           </ol>
         </nav>
-        <div className="mt-4 flex items-center justify-center space-x-2">
-          <button
-            type="button"
-            onClick={() => handleSave(false)}
-            className="px-3 py-1 text-sm font-medium text-primary-600 bg-white border border-primary-300 rounded-md hover:bg-primary-50"
-            disabled={saving}
-          >
-            Save Draft
-          </button>
-          {draftStatus && (
-            <span className="text-sm text-gray-500">
-              {draftStatus === 'saving' ? 'Saving...' : 'Saved'}
-            </span>
-          )}
-        </div>
       </div>
 
       {error && (
@@ -287,17 +651,45 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
             />
             
             <div className="mt-8">
-              <PhotoUpload 
-                photo={event?.photo}
-                onPhotoChange={(photo) => {
-                  if (event) {
-                    updateEvent(event.id, {
-                      ...event,
-                      photo,
-                    });
-                  }
-                }}
-              />
+              <div className="flex gap-4">
+                <div className="w-64 flex-shrink-0">
+                  <ImageUpload
+                    label="Event Photo"
+                    currentImage={eventPhotos.photo || currentOrganization?.logoImage}
+                    onImageChange={handlePhotoUpload}
+                    isUploading={photoUploading}
+                    aspectRatio="square"
+                    className="h-64"
+                  />
+                </div>
+                <div className="flex-1">
+                  <ImageUpload
+                    label="Event Cover Image"
+                    currentImage={eventPhotos.coverImage}
+                    onImageChange={handleCoverImageUpload}
+                    isUploading={coverImageUploading}
+                    aspectRatio="cover"
+                    className="h-64"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-between">
+              <button
+                type="button"
+                onClick={handleBack}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+              >
+                Next
+              </button>
             </div>
           </div>
         )}
@@ -305,30 +697,201 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
         {currentStep === 'widgets' && (
           <div className="space-y-6">
             <h2 className="text-lg font-medium !text-gray-900 dark:!text-white">Configure Widgets</h2>
-            <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-              <div className="lg:col-span-1">
+            <div className="grid grid-cols-1 gap-8">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">Available Widgets</h3>
                 <WidgetSelector
                   selectedWidgets={widgetConfig.widgets}
                   onWidgetsChange={(widgets) => setWidgetConfig({ widgets })}
                 />
               </div>
-              <div className="lg:col-span-2">
-                <div className="space-y-8">
-                  {widgetConfig.widgets.filter(w => w.isEnabled).map((widget) => (
-                    <WidgetConfigForm
-                      key={widget.id}
-                      widget={widget}
-                      onChange={(updatedWidget) => {
-                        setWidgetConfig({
-                          widgets: widgetConfig.widgets.map((w) =>
-                            w.id === updatedWidget.id ? updatedWidget : w
-                          ),
-                        });
-                      }}
-                    />
-                  ))}
+
+              {widgetConfig.widgets.some(w => ['messageBoard', 'website', 'phoneNumber', 'call'].includes(w.type)) && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                  <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">Widget Configuration</h3>
+                  <div className="space-y-6">
+                    {widgetConfig.widgets
+                      .filter(w => ['messageBoard', 'website', 'phoneNumber', 'call'].includes(w.type))
+                      .map((widget) => (
+                        <div key={widget.id} className="border-b border-gray-200 dark:border-gray-700 pb-6 last:border-0 last:pb-0">
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">
+                            {widget.type === 'messageBoard' ? 'Message Board' :
+                             widget.type === 'website' ? 'Website' :
+                             widget.type === 'phoneNumber' || widget.type === 'call' ? 'Phone Number' :
+                             'Phone Number'}
+                          </h4>
+                          {(widget.type === 'website') && (
+                            <div className="space-y-4">
+                              {currentOrganization?.website && (
+                                <div>
+                                  <select
+                                    id={`${widget.id}-website-type`}
+                                    value={widget.config.useOrganizationWebsite ? 'organization' : 'custom'}
+                                    onChange={(e) => {
+                                      const useOrg = e.target.value === 'organization';
+                                      const updatedWidgets = widgetConfig.widgets.map(w =>
+                                        w.id === widget.id
+                                          ? { ...w, config: { ...w.config, useOrganizationWebsite: useOrg } }
+                                          : w
+                                      );
+                                      setWidgetConfig({ widgets: updatedWidgets });
+                                    }}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white p-2"
+                                  >
+                                    <option value="organization">Use Organization Website</option>
+                                    <option value="custom">Use Custom Website</option>
+                                  </select>
+                                </div>
+                              )}
+                              {(!widget.config.useOrganizationWebsite || !currentOrganization?.website) && (
+                                <div>
+                                  <input
+                                    type="url"
+                                    id={`${widget.id}-custom-url`}
+                                    value={widget.config.customUrl || ''}
+                                    onChange={(e) => {
+                                      const updatedWidgets = widgetConfig.widgets.map(w =>
+                                        w.id === widget.id
+                                          ? { ...w, config: { ...w.config, customUrl: e.target.value } }
+                                          : w
+                                      );
+                                      setWidgetConfig({ widgets: updatedWidgets });
+                                    }}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white p-2"
+                                    placeholder="https://"
+                                    required={widget.isEnabled}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {(widget.type === 'phoneNumber' || widget.type === 'call') && (
+                            <div className="space-y-4">
+                              {currentOrganization?.phoneNumber && (
+                                <div>
+                                  <select
+                                    id={`${widget.id}-phone-type`}
+                                    value={widget.config.useOrganizationPhone ? 'organization' : 'custom'}
+                                    onChange={(e) => {
+                                      const useOrg = e.target.value === 'organization';
+                                      const updatedWidgets = widgetConfig.widgets.map(w =>
+                                        w.id === widget.id
+                                          ? { ...w, config: { ...w.config, useOrganizationPhone: useOrg } }
+                                          : w
+                                      );
+                                      setWidgetConfig({ widgets: updatedWidgets });
+                                    }}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white p-2"
+                                  >
+                                    <option value="organization">Use Organization Phone Number</option>
+                                    <option value="custom">Use Custom Phone Number</option>
+                                  </select>
+                                </div>
+                              )}
+                              {(!widget.config.useOrganizationPhone || !currentOrganization?.phoneNumber) && (
+                                <div>
+                                  <input
+                                    type="tel"
+                                    id={`${widget.id}-custom-phone`}
+                                    value={widget.config.customPhone || ''}
+                                    onChange={(e) => {
+                                      const updatedWidgets = widgetConfig.widgets.map(w =>
+                                        w.id === widget.id
+                                          ? { ...w, config: { ...w.config, customPhone: e.target.value } }
+                                          : w
+                                      );
+                                      setWidgetConfig({ widgets: updatedWidgets });
+                                    }}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white p-2"
+                                    placeholder="+1234567890"
+                                    required={widget.isEnabled}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {widget.type === 'messageBoard' && (
+                            <div className="space-y-4">
+                              {widget.config.messages?.map((message: any, index: number) => (
+                                <div key={index} className="flex items-start space-x-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                  <div className="flex-1">
+                                    <p className="text-sm text-gray-900 dark:text-gray-100">{message.content}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      {new Date(message.timestamp).toLocaleString()}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                              <div className="flex space-x-3">
+                                <textarea
+                                  placeholder="Add a message..."
+                                  value={widget.config.newMessage || ''}
+                                  onChange={(e) => {
+                                    const updatedWidgets = widgetConfig.widgets.map(w =>
+                                      w.id === widget.id
+                                        ? { ...w, config: { ...w.config, newMessage: e.target.value } }
+                                        : w
+                                    );
+                                    setWidgetConfig({ widgets: updatedWidgets });
+                                  }}
+                                  rows={1}
+                                  style={{ minHeight: '42px', resize: 'vertical' }}
+                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white p-2"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!widget.config.newMessage?.trim()) return;
+                                    
+                                    const newMessage = {
+                                      content: widget.config.newMessage.trim(),
+                                      timestamp: new Date().toISOString(),
+                                      creatorId: currentOrganization?.id
+                                    };
+                                    
+                                    const updatedWidgets = widgetConfig.widgets.map(w =>
+                                      w.id === widget.id
+                                        ? {
+                                            ...w,
+                                            config: {
+                                              ...w.config,
+                                              messages: [...(w.config.messages || []), newMessage],
+                                              newMessage: ''
+                                            }
+                                          }
+                                        : w
+                                    );
+                                    setWidgetConfig({ widgets: updatedWidgets });
+                                  }}
+                                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                    ))}
+                  </div>
                 </div>
+              )}
               </div>
+
+            <div className="mt-6 flex justify-between">
+              <button
+                type="button"
+                onClick={handleBack}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+              >
+                Next
+              </button>
             </div>
           </div>
         )}
@@ -336,74 +899,96 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
         {currentStep === 'publish' && (
           <div className="space-y-6">
             <h2 className="text-lg font-medium !text-gray-900 dark:!text-white">Review & Publish</h2>
-            <EventPreview
-              event={{
-                id: event?.id || '',
-                title: basicInfo.title,
-                description: basicInfo.description,
-                start: basicInfo.startDate,
-                end: basicInfo.endDate,
-                timezone: basicInfo.timezone,
-                location: basicInfo.location,
-                visibility: basicInfo.visibility,
-                recurrence: basicInfo.recurrence,
-                widgets: widgetConfig.widgets,
-                createdAt: event?.createdAt || new Date(),
-                updatedAt: new Date(),
-                organizationId: currentOrganization?.id || '',
-                owner: event?.owner || '',
-                status: event?.status || 'draft',
-                source: event?.source || 'events',
-                photo: event?.photo,
-                coverImage: event?.coverImage,
-                logoImage: event?.logoImage,
-              }}
-            />
-          </div>
-        )}
+            
+            <div className="space-y-8">
+              {/* Images Row */}
+              <div className="flex gap-4">
+                <div className="w-64 flex-shrink-0">
+                  <div className="relative w-full h-64 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10">
+                    {eventPhotos.photo ? (
+                      <img
+                        src={eventPhotos.photo}
+                        alt="Event Photo"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                        <span className="text-sm">No photo uploaded</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <div className="relative w-full h-64 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10">
+                    {eventPhotos.coverImage ? (
+                      <img
+                        src={eventPhotos.coverImage}
+                        alt="Event Cover"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                        <span className="text-sm">No cover image uploaded</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-        <div className="mt-6 flex justify-between">
-          {currentStep !== 'basic-info' && (
-            <button
-              type="button"
-              onClick={handleBack}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Back
-            </button>
-          )}
-          <div className="flex space-x-3">
-            {currentStep !== 'publish' ? (
+              {/* Event Details */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                <EventPreview
+                  event={{
+                    id: event?.id || '',
+                    title: basicInfo.title,
+                    description: basicInfo.description,
+                    start: basicInfo.startDate,
+                    end: basicInfo.endDate,
+                    timezone: basicInfo.timezone,
+                    location: basicInfo.location,
+                    visibility: basicInfo.visibility,
+                    recurrence: basicInfo.recurrence,
+                    widgets: widgetConfig.widgets.filter(w => w.isEnabled),
+                    createdAt: event?.createdAt || new Date(),
+                    updatedAt: new Date(),
+                    organizationId: currentOrganization?.id || '',
+                    owner: event?.owner || '',
+                    status: event?.status || 'draft',
+                    source: event?.source || 'events',
+                    photo: eventPhotos.photo,
+                    coverImage: eventPhotos.coverImage,
+                    logoImage: eventPhotos.logoImage,
+                    isPublic: basicInfo.visibility === 'public',
+                    isDiscoverable: basicInfo.visibility === 'public',
+                    attendees: [],
+                    accepted: [],
+                    declined: [],
+                    undecided: [],
+                  }}
+                  isPreview={true}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-between">
               <button
                 type="button"
-                onClick={handleNext}
+                onClick={handleBack}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSave(true)}
                 className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
                 disabled={saving}
               >
-                Next
+                {saving ? 'Publishing...' : 'Publish'}
               </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleSave(false)}
-                  className="px-4 py-2 text-sm font-medium text-primary-600 bg-white border border-primary-300 rounded-md hover:bg-primary-50"
-                  disabled={saving}
-                >
-                  Save as Draft
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSave(true)}
-                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
-                  disabled={saving}
-                >
-                  Publish
-                </button>
-              </>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
