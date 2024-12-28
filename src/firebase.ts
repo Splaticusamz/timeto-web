@@ -1,42 +1,39 @@
 import { initializeApp } from 'firebase/app';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, enableIndexedDbPersistence, connectFirestoreEmulator } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
 
-// Use completely fake config in development
-const firebaseConfig = import.meta.env.VITE_USE_EMULATOR === 'true' ? {
-  apiKey: 'demo-key-123',
-  authDomain: 'demo-project.firebaseapp.com',
-  projectId: 'timeto-69867',
-} : {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: "timeto-web.firebasestorage.app",
-  messagingSenderId: "741706093241",
-  appId: "1:741706093241:web:791a8d9ef0dfcb3c0c4168",
-  measurementId: "G-WXL7J4DHH2"
+// Helper function to get environment variables that works in both Vite and Node.js
+const getEnvVar = (key: string) => {
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key];
+  }
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[key];
+  }
+  return undefined;
 };
 
-// Initialize Firebase
+const firebaseConfig = getEnvVar('VITE_USE_EMULATOR') === 'true' ? {
+  apiKey: 'test-api-key',
+  authDomain: 'test-auth-domain',
+  projectId: 'test-project-id',
+  storageBucket: 'test-storage-bucket',
+  messagingSenderId: 'test-messaging-sender-id',
+  appId: 'test-app-id'
+} : {
+  apiKey: getEnvVar('VITE_FIREBASE_API_KEY'),
+  authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN'),
+  projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID'),
+  storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: getEnvVar('VITE_FIREBASE_APP_ID')
+};
+
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+export const db = getFirestore(app);
+export const auth = getAuth(app);
 
-if (import.meta.env.VITE_USE_EMULATOR === 'true') {
-  // Connect to emulators before any other Firestore operations
+if (getEnvVar('VITE_USE_EMULATOR') === 'true') {
   connectFirestoreEmulator(db, 'localhost', 8081);
-  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-  
-  // Enable persistence after emulator connection
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
-    } else if (err.code === 'unimplemented') {
-      console.warn('The current browser does not support persistence.');
-    }
-  });
-}
-
-export { auth, db };
-export default app; 
+  connectAuthEmulator(auth, 'http://localhost:9099');
+} 

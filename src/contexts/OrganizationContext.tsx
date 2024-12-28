@@ -196,6 +196,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         createdAt: now,
         updatedAt: now,
         ownerId: currentUser.uid,
+        nameLower: data.name.toLowerCase(),
         members: {
           [currentUser.uid]: 'owner' as const,
         },
@@ -245,6 +246,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       await updateDoc(orgRef, {
         ...data,
         updatedAt: now,
+        ...(data.name ? { nameLower: data.name.toLowerCase() } : {}),
       });
 
       const updatedOrg = {

@@ -34,12 +34,16 @@ export default function Events() {
 
     // Apply sorting
     result.sort((a, b) => {
-      let aValue = a[sortField];
-      let bValue = b[sortField];
+      let aValue: any = a[sortField];
+      let bValue: any = b[sortField];
 
-      if (sortField === 'startDate' || sortField === 'createdAt') {
-        aValue = new Date(aValue).getTime();
-        bValue = new Date(bValue).getTime();
+      // Handle special cases for date fields
+      if (sortField === 'startDate') {
+        aValue = new Date(a.start).getTime();
+        bValue = new Date(b.start).getTime();
+      } else if (sortField === 'createdAt') {
+        aValue = new Date(a.createdAt).getTime();
+        bValue = new Date(b.createdAt).getTime();
       }
 
       if (typeof aValue === 'string') {
@@ -271,16 +275,23 @@ export default function Events() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900 dark:text-white">
-                            {new Date(event.startDate).toLocaleDateString()}
+                            {new Date(event.start).toLocaleDateString()}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(event.startDate).toLocaleTimeString()}
+                            {new Date(event.start).toLocaleTimeString()}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(event.status)}`}>
-                            {event.status}
-                          </span>
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(event.status)}`}>
+                              {event.status}
+                            </span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                              {event.visibility === 'organization' ? 'Org' :
+                               event.visibility === 'invite-only' ? 'Invite' :
+                               'Public'}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {new Date(event.createdAt).toLocaleDateString()}

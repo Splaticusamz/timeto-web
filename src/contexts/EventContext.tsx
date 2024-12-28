@@ -35,19 +35,15 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
-      // Load from both events and publicEvents collections
       const eventsRef = collection(db, 'events');
       const publicEventsRef = collection(db, 'publicEvents');
 
       const [privateEvents, publicEvents] = await Promise.all([
-        // Private events query - match by owner
         getDocs(query(
           eventsRef,
           where('owner', '==', currentOrganization.id),
           orderBy('start', 'desc')
         )),
-        
-        // Public events query - match by owner
         getDocs(query(
           publicEventsRef,
           where('owner', '==', currentOrganization.id),
@@ -58,44 +54,43 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       const loadedEvents: Event[] = [
         ...privateEvents.docs.map(doc => {
           const data = doc.data();
-          console.log('Raw Firestore data:', data);
-          
           return {
             id: doc.id,
             source: 'events' as const,
             title: data.title || '',
             description: data.description || '',
-            start: data.start?._seconds 
-              ? new Date(data.start._seconds * 1000) 
-              : data.start instanceof Date 
-                ? data.start 
-                : new Date(data.start),
-            end: data.end?._seconds 
-              ? new Date(data.end._seconds * 1000) 
-              : data.end instanceof Date 
-                ? data.end 
-                : data.end ? new Date(data.end) : undefined,
+            start: data.start instanceof Timestamp ? data.start.toDate() : new Date(data.start),
+            end: data.end instanceof Timestamp ? data.end.toDate() : data.end ? new Date(data.end) : undefined,
             timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
             organizationId: data.organizationId,
             owner: data.owner,
             status: data.status || 'draft',
             visibility: data.visibility || 'organization',
             location: data.location || { type: 'fixed' as const },
-            widgets: data.widgets?.map((w: string) => ({
-              id: w,
-              type: w,
-              config: {},
-              data: {},
-              order: 0,
-              isEnabled: true
-            })) || [],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            photo: data.photo || data.photoUrl || data.image || data.imageUrl,
-            phoneNumber: data.phoneNumber || data.phone || data.tel,
-            website: data.website || data.url || data.webUrl,
-            coverImage: data.coverImage || data.coverPhoto || data.cover,
-            logoImage: data.logoImage || data.logo,
+            widgets: Array.isArray(data.widgets) ? data.widgets.map((w: any) => 
+              typeof w === 'string' ? {
+                id: w,
+                type: w,
+                isEnabled: true,
+                config: {},
+                data: {},
+                order: 0
+              } : {
+                id: w.id || w.type,
+                type: w.type,
+                isEnabled: w.isEnabled ?? true,
+                config: w.config || {},
+                data: w.data || {},
+                order: w.order || 0
+              }
+            ).filter(w => w.isEnabled !== false) : [],
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
+            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
+            photo: data.photo || null,
+            phoneNumber: data.phoneNumber || null,
+            website: data.website || null,
+            coverImage: data.coverImage || null,
+            logoImage: data.logoImage || null,
             attendees: Array.isArray(data.attendees) ? data.attendees : [],
             accepted: Array.isArray(data.accepted) ? data.accepted : [],
             declined: Array.isArray(data.declined) ? data.declined : [],
@@ -104,44 +99,43 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
         }),
         ...publicEvents.docs.map(doc => {
           const data = doc.data();
-          console.log('Raw public event data:', data);
-
           return {
             id: doc.id,
             source: 'publicEvents' as const,
             title: data.title || '',
             description: data.description || '',
-            start: data.start?._seconds 
-              ? new Date(data.start._seconds * 1000) 
-              : data.start instanceof Date 
-                ? data.start 
-                : new Date(data.start),
-            end: data.end?._seconds 
-              ? new Date(data.end._seconds * 1000) 
-              : data.end instanceof Date 
-                ? data.end 
-                : data.end ? new Date(data.end) : undefined,
+            start: data.start instanceof Timestamp ? data.start.toDate() : new Date(data.start),
+            end: data.end instanceof Timestamp ? data.end.toDate() : data.end ? new Date(data.end) : undefined,
             timezone: data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
             organizationId: data.organizationId || currentOrganization.id,
             owner: data.owner || currentOrganization.id,
             status: data.status || 'published',
             visibility: data.visibility || 'organization',
             location: data.location || { type: 'fixed' as const },
-            widgets: data.widgets?.map((w: string) => ({
-              id: w,
-              type: w,
-              config: {},
-              data: {},
-              order: 0,
-              isEnabled: true
-            })) || [],
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            photo: data.photo || data.photoUrl || data.image || data.imageUrl,
-            phoneNumber: data.phoneNumber || data.phone || data.tel,
-            website: data.website || data.url || data.webUrl,
-            coverImage: data.coverImage || data.coverPhoto || data.cover,
-            logoImage: data.logoImage || data.logo,
+            widgets: Array.isArray(data.widgets) ? data.widgets.map((w: any) => 
+              typeof w === 'string' ? {
+                id: w,
+                type: w,
+                isEnabled: true,
+                config: {},
+                data: {},
+                order: 0
+              } : {
+                id: w.id || w.type,
+                type: w.type,
+                isEnabled: w.isEnabled ?? true,
+                config: w.config || {},
+                data: w.data || {},
+                order: w.order || 0
+              }
+            ).filter(w => w.isEnabled !== false) : [],
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
+            updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
+            photo: data.photo || null,
+            phoneNumber: data.phoneNumber || null,
+            website: data.website || null,
+            coverImage: data.coverImage || null,
+            logoImage: data.logoImage || null,
             attendees: Array.isArray(data.attendees) ? data.attendees : [],
             accepted: Array.isArray(data.accepted) ? data.accepted : [],
             declined: Array.isArray(data.declined) ? data.declined : [],
@@ -178,7 +172,7 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       timezone: data.timezone,
       location: data.location,
       visibility: data.visibility,
-      widgets: data.widgets.filter(w => w.isEnabled),
+      widgets: data.widgets.filter(w => w.isEnabled !== false),
       createdAt: now.toDate(),
       updatedAt: now.toDate(),
       owner: currentOrganization.id,
@@ -206,15 +200,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
         end: data.end ? Timestamp.fromDate(data.end) : null,
         createdAt: now,
         updatedAt: now,
-        // Store widgets with their full configuration
-        widgets: data.widgets.filter(w => w.isEnabled).map(w => ({
-          id: w.id,
-          type: w.type,
-          isEnabled: true,
-          config: w.config || {},
-          data: w.data || {},
-          order: w.order || 0
-        }))
+        // Store widgets as strings to match existing database structure
+        widgets: data.widgets.filter(w => w.isEnabled !== false).map(w => w.type)
       };
 
       await setDoc(docRef, docData);
@@ -243,38 +230,122 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const eventRef = doc(db, 'events', id);
-      const eventDoc = await getDoc(eventRef);
+      // Try to find the event in both collections
+      const [privateDoc, publicDoc] = await Promise.all([
+        getDoc(doc(db, 'events', id)),
+        getDoc(doc(db, 'publicEvents', id))
+      ]);
+
+      let eventDoc = privateDoc.exists() ? privateDoc : publicDoc;
+      let currentCollection = privateDoc.exists() ? 'events' : 'publicEvents';
       
       if (!eventDoc.exists()) {
         throw new Error('Event not found');
       }
 
-      const updatedData = {
-        ...data,
-        phoneNumber: data.phoneNumber,
-        website: data.website,
-        updatedAt: new Date().toISOString(),
+      const currentData = eventDoc.data();
+      const updatedData: any = {
+        updatedAt: Timestamp.now()
       };
 
+      // Only include fields that are actually being updated
+      Object.keys(data).forEach(key => {
+        if (data[key] !== undefined) {
+          updatedData[key] = data[key];
+        }
+      });
+
+      // Handle special cases for dates
+      if (data.start instanceof Date) {
+        updatedData.start = Timestamp.fromDate(data.start);
+      } else if (data.start && typeof data.start === 'object' && 'seconds' in data.start) {
+        updatedData.start = new Timestamp(data.start.seconds, data.start.nanoseconds || 0);
+      }
+      
+      if (data.end instanceof Date) {
+        updatedData.end = Timestamp.fromDate(data.end);
+      } else if (data.end && typeof data.end === 'object' && 'seconds' in data.end) {
+        updatedData.end = new Timestamp(data.end.seconds, data.end.nanoseconds || 0);
+      }
+
+      // Handle widgets if they're being updated
+      if (data.widgets) {
+        updatedData.widgets = data.widgets
+          .filter(w => w.isEnabled !== false)
+          .map(w => w.type);
+      }
+
+      // Check if visibility is changing and requires moving to a different collection
+      const targetCollection = (data.visibility === 'public') ? 'publicEvents' : 'events';
+      
+      if (targetCollection !== currentCollection) {
+        // Create the event in the new collection
+        const newDocRef = doc(collection(db, targetCollection));
+        
+        // Prepare the full event data for the new document
+        const fullEventData = {
+          ...currentData,
+          ...updatedData,
+          id: newDocRef.id,
+          source: targetCollection as EventSource,
+        };
+
+        // Delete from old collection and create in new collection
+        await Promise.all([
+          deleteDoc(doc(db, currentCollection, id)),
+          setDoc(newDocRef, fullEventData)
+        ]);
+
+        // Construct the updated event
+        const updatedEvent: Event = {
+          ...currentData,
+          ...data,
+          id: newDocRef.id,
+          source: targetCollection as EventSource,
+          updatedAt: updatedData.updatedAt.toDate(),
+          start: updatedData.start ? updatedData.start.toDate() : currentData.start.toDate(),
+          end: updatedData.end ? updatedData.end.toDate() : currentData.end?.toDate(),
+          widgets: updatedData.widgets || currentData.widgets
+        };
+
+        // Update local state and trigger a reload
+        setEvents(prev => prev.map(event => 
+          event.id === id ? updatedEvent : event
+        ));
+
+        // Reload events to ensure consistency
+        await loadEvents();
+
+        return updatedEvent;
+      }
+
+      // If visibility isn't changing, just update the current document
+      const eventRef = doc(db, currentCollection, id);
       await updateDoc(eventRef, updatedData);
-      const eventData = eventDoc.data() as Event;
+
+      // Construct the updated event
       const updatedEvent: Event = {
-        ...eventData,
-        ...updatedData,
+        ...currentData,
+        ...data,
         id,
-        updatedAt: new Date(updatedData.updatedAt), // Convert string to Date
+        source: currentCollection as EventSource,
+        updatedAt: updatedData.updatedAt.toDate(),
+        start: updatedData.start ? updatedData.start.toDate() : currentData.start.toDate(),
+        end: updatedData.end ? updatedData.end.toDate() : currentData.end?.toDate(),
+        widgets: updatedData.widgets || currentData.widgets
       };
 
+      // Update the local state
       setEvents((prev) =>
         prev.map((event) => (event.id === id ? updatedEvent : event))
       );
 
       return updatedEvent;
     } catch (err) {
+      console.error('Update event error:', err);
       throw new Error('Failed to update event');
     }
-  }, [currentUser]);
+  }, [currentUser, loadEvents]);
 
   const deleteEvent = useCallback(async (id: string): Promise<void> => {
     if (!currentUser) {
@@ -305,6 +376,17 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Failed to save draft');
     }
   }, [currentUser]);
+
+  // Add an effect to refresh events periodically
+  useEffect(() => {
+    if (!currentUser || !currentOrganization) return;
+
+    const refreshInterval = setInterval(() => {
+      loadEvents();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [currentUser, currentOrganization, loadEvents]);
 
   const value = {
     events,

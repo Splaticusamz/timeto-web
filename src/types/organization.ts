@@ -28,6 +28,7 @@ export interface UserRoles {
 export interface Organization {
   id: string;
   name: string;
+  nameLower: string;
   type: OrganizationType;
   description?: string;
   logo?: string;

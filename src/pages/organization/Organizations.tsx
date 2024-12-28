@@ -1,86 +1,155 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useOrganization } from '../../contexts/OrganizationContext';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, startAfter, limit, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { UserIcon, UsersIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import debounce from 'lodash/debounce';
+
+interface OrganizationEventCounts {
+  [key: string]: {
+    private: number;
+    public: number;
+  };
+}
 
 export function Organizations() {
-  const { userOrganizations, currentOrganization, switchOrganization } = useOrganization();
-  const [organizationEventCounts, setOrganizationEventCounts] = useState<Record<string, {private: number, public: number}>>({});
+  const { currentOrganization, switchOrganization } = useOrganization();
+  const [organizationEventCounts, setOrganizationEventCounts] = useState<OrganizationEventCounts>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const ITEMS_PER_PAGE = 10;
 
-  // Helper function to chunk array into smaller arrays
-  const chunkArray = <T,>(array: T[], size: number): T[][] => {
-    const chunks: T[][] = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
+  const loadOrganizations = async (searchQuery: string = '', lastDoc: QueryDocumentSnapshot<DocumentData> | null = null) => {
+    try {
+      if (!searchQuery && lastDoc) {
+        setIsLoadingMore(true);
+      } else {
+        setIsLoading(true);
+      }
+
+      let baseQuery;
+      
+      if (searchQuery) {
+        // When searching, use a simple prefix search
+        baseQuery = query(
+          collection(db, 'organizations'),
+          orderBy('name'),
+          where('name', '>=', searchQuery),
+          where('name', '<=', searchQuery + '\uf8ff'),
+          limit(ITEMS_PER_PAGE)
+        );
+      } else {
+        // Normal paginated load when not searching
+        baseQuery = query(
+          collection(db, 'organizations'),
+          orderBy('name'),
+          limit(ITEMS_PER_PAGE)
+        );
+
+        if (lastDoc) {
+          baseQuery = query(baseQuery, startAfter(lastDoc));
+        }
+      }
+
+      const snapshot = await getDocs(baseQuery);
+      const fetchedOrgs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      // Update pagination state
+      setHasMore(snapshot.docs.length === ITEMS_PER_PAGE);
+      setLastVisible(snapshot.docs[snapshot.docs.length - 1] || null);
+
+      // Update organizations state
+      if (!searchQuery && lastDoc) {
+        setOrganizations(prev => [...prev, ...fetchedOrgs]);
+      } else {
+        setOrganizations(fetchedOrgs);
+      }
+
+      // Load event counts for organizations
+      const counts: OrganizationEventCounts = {};
+      await Promise.all(
+        fetchedOrgs.map(async (org) => {
+          // Query both private and public events in parallel
+          const [eventsRef, publicEventsRef] = [
+            collection(db, 'events'),
+            collection(db, 'publicEvents')
+          ];
+
+          const [privateEventsQuery, publicEventsQuery] = [
+            query(eventsRef, where('owner', '==', org.id)),
+            query(publicEventsRef, where('owner', '==', org.id))
+          ];
+
+          try {
+            const [privateEvents, publicEvents] = await Promise.all([
+              getDocs(privateEventsQuery),
+              getDocs(publicEventsQuery)
+            ]);
+
+            counts[org.id] = {
+              private: privateEvents.size,
+              public: publicEvents.size
+            };
+          } catch (error) {
+            console.error(`Error loading events for org ${org.id}:`, error);
+            counts[org.id] = {
+              private: 0,
+              public: 0
+            };
+          }
+        })
+      );
+
+      setOrganizationEventCounts(prev => ({ ...prev, ...counts }));
+    } catch (err) {
+      console.error('Failed to load organizations:', err);
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
     }
-    return chunks;
   };
 
+  const debouncedSearch = useCallback(
+    debounce((query: string) => {
+      setLastVisible(null);
+      setHasMore(true);
+      // Capitalize first letter to match the format in the database
+      const formattedQuery = query ? query.charAt(0).toUpperCase() + query.slice(1) : '';
+      loadOrganizations(formattedQuery);
+    }, 300),
+    []
+  );
+
   useEffect(() => {
-    const loadEventCounts = async () => {
-      if (!userOrganizations.length) return;
-      
-      setIsLoading(true);
-      try {
-        const orgIds = userOrganizations.map(org => org.id);
-        const CHUNK_SIZE = 30; // Firestore's limit for 'in' queries
-        const orgIdChunks = chunkArray(orgIds, CHUNK_SIZE);
+    debouncedSearch(searchTerm);
+    return () => debouncedSearch.cancel();
+  }, [searchTerm, debouncedSearch]);
 
-        const counts: Record<string, {private: number, public: number}> = {};
-        orgIds.forEach(id => {
-          counts[id] = { private: 0, public: 0 };
-        });
-
-        // Process chunks sequentially
-        for (const chunk of orgIdChunks) {
-          // Query private events for this chunk
-          const privateEventsQuery = query(
-            collection(db, 'events'),
-            where('owner', 'in', chunk)
-          );
-
-          // Query public events for this chunk
-          const publicEventsQuery = query(
-            collection(db, 'publicEvents'),
-            where('owner', 'in', chunk)
-          );
-
-          const [privateSnapshot, publicSnapshot] = await Promise.all([
-            getDocs(privateEventsQuery),
-            getDocs(publicEventsQuery)
-          ]);
-
-          // Count private events
-          privateSnapshot.forEach(doc => {
-            const owner = doc.data().owner;
-            if (counts[owner]) {
-              counts[owner].private++;
-            }
-          });
-
-          // Count public events
-          publicSnapshot.forEach(doc => {
-            const owner = doc.data().owner;
-            if (counts[owner]) {
-              counts[owner].public++;
-            }
-          });
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !isLoading && !isLoadingMore) {
+          loadOrganizations(searchTerm, lastVisible);
         }
+      },
+      { threshold: 0.1 }
+    );
 
-        console.log('Event counts:', counts);
-        setOrganizationEventCounts(counts);
-      } catch (err) {
-        console.error('Failed to load event counts:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
 
-    loadEventCounts();
-  }, [userOrganizations]);
+    return () => observer.disconnect();
+  }, [hasMore, isLoading, isLoadingMore, lastVisible, searchTerm]);
 
   const handleOrganizationClick = async (orgId: string) => {
     try {
@@ -89,10 +158,6 @@ export function Organizations() {
       console.error('Failed to switch organization:', err);
     }
   };
-
-  const filteredOrganizations = userOrganizations.filter(org => 
-    org.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   const EventCountPill = ({ type, count }: { type: 'private' | 'public', count: number }) => {
     const isPrimary = type === 'private';
@@ -155,7 +220,7 @@ export function Organizations() {
       </div>
 
       <div className="mt-6 space-y-4">
-        {filteredOrganizations.map(org => (
+        {organizations.map(org => (
           <div
             key={org.id}
             onClick={() => handleOrganizationClick(org.id)}
@@ -187,6 +252,25 @@ export function Organizations() {
             </div>
           </div>
         ))}
+
+        {/* Infinite scroll observer target */}
+        <div 
+          ref={observerTarget} 
+          className="h-4"
+          aria-hidden="true"
+        />
+
+        {(isLoading || isLoadingMore) && (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          </div>
+        )}
+
+        {!isLoading && organizations.length === 0 && (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            No organizations found
+          </div>
+        )}
       </div>
     </div>
   );
