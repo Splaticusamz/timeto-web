@@ -11,7 +11,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="lg:pl-72">
         <Header onMenuClick={() => setSidebarOpen(true)} />
         <main className="py-10">
-          <div className="px-4 sm:px-6 lg:px-8">{children}</div>
+          <div className="px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+              {children}
+            </div>
+          </div>
         </main>
       </div>
     </div>

@@ -50,7 +50,7 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
     title: event?.title || '',
     description: event?.description || '',
     startDate: event?.start || new Date(),
-    endDate: event?.end,
+    endDate: event?.end || new Date(new Date().setHours(new Date().getHours() + 1)),
     timezone: event?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
     location: event?.location || {
       type: 'fixed' as LocationType,
@@ -98,6 +98,18 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
 
     return () => clearInterval(interval);
   }, [event?.id, basicInfo, widgetConfig, currentOrganization?.id, saveDraft]);
+
+  useEffect(() => {
+    // When start date changes, update end date to be 1 hour later if not already set
+    if (basicInfo.startDate && (!event?.end || !basicInfo.endDate)) {
+      const newEndDate = new Date(basicInfo.startDate);
+      newEndDate.setHours(newEndDate.getHours() + 1);
+      setBasicInfo(prev => ({
+        ...prev,
+        endDate: newEndDate
+      }));
+    }
+  }, [basicInfo.startDate, event?.end]);
 
   const compressImage = async (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
@@ -251,6 +263,9 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
   };
 
   const validateWidgets = (): boolean => {
+    // Debug logging
+    console.log('Validating widgets:', widgetConfig.widgets);
+
     // At least one widget should be enabled
     if (!widgetConfig.widgets.some(w => w.isEnabled)) {
       setError('Please enable at least one widget');
@@ -261,25 +276,47 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
     for (const widget of widgetConfig.widgets) {
       if (!widget.isEnabled) continue;
 
+      console.log('Checking widget:', widget.type, widget.config);
+
       if (widget.type === 'website') {
-        if (widget.config.useOrganizationWebsite && !currentOrganization?.website) {
-          setError('Organization website is not available. Please enter a custom website.');
-          return false;
-        }
-        if (!widget.config.useOrganizationWebsite && !widget.config.customUrl) {
-          setError('Please enter a website URL');
-          return false;
+        // If org has no website, only check custom URL
+        if (!currentOrganization?.website) {
+          if (!widget.config.customUrl) {
+            setError('Please enter a website URL');
+            return false;
+          }
+        } else {
+          // If org has website, check based on selection
+          if (widget.config.useOrganizationWebsite) {
+            if (!currentOrganization.website) {
+              setError('Please enter a website URL');
+              return false;
+            }
+          } else if (!widget.config.customUrl) {
+            setError('Please enter a website URL');
+            return false;
+          }
         }
       }
 
       if (widget.type === 'phoneNumber' || widget.type === 'call') {
-        if (widget.config.useOrganizationPhone && !currentOrganization?.phoneNumber) {
-          setError('Organization phone number is not available. Please enter a custom phone number.');
-          return false;
-        }
-        if (!widget.config.useOrganizationPhone && !widget.config.customPhone) {
-          setError('Please enter a phone number');
-          return false;
+        // If org has no phone, only check custom phone
+        if (!currentOrganization?.phoneNumber) {
+          if (!widget.config.customPhone) {
+            setError('Please enter a phone number');
+            return false;
+          }
+        } else {
+          // If org has phone, check based on selection
+          if (widget.config.useOrganizationPhone) {
+            if (!currentOrganization.phoneNumber) {
+              setError('Please enter a phone number');
+              return false;
+            }
+          } else if (!widget.config.customPhone) {
+            setError('Please enter a phone number');
+            return false;
+          }
         }
       }
 
@@ -752,7 +789,14 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
                                     onChange={(e) => {
                                       const updatedWidgets = widgetConfig.widgets.map(w =>
                                         w.id === widget.id
-                                          ? { ...w, config: { ...w.config, customUrl: e.target.value } }
+                                          ? { 
+                                              ...w, 
+                                              config: { 
+                                                ...w.config, 
+                                                customUrl: e.target.value,
+                                                useOrganizationWebsite: false // Force this to false when entering custom URL
+                                              } 
+                                            }
                                           : w
                                       );
                                       setWidgetConfig({ widgets: updatedWidgets });
@@ -901,42 +945,8 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
             <h2 className="text-lg font-medium !text-gray-900 dark:!text-white">Review & Publish</h2>
             
             <div className="space-y-8">
-              {/* Images Row */}
-              <div className="flex gap-4">
-                <div className="w-64 flex-shrink-0">
-                  <div className="relative w-full h-64 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10">
-                    {eventPhotos.photo ? (
-                      <img
-                        src={eventPhotos.photo}
-                        alt="Event Photo"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                        <span className="text-sm">No photo uploaded</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <div className="relative w-full h-64 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10">
-                    {eventPhotos.coverImage ? (
-                      <img
-                        src={eventPhotos.coverImage}
-                        alt="Event Cover"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                        <span className="text-sm">No cover image uploaded</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               {/* Event Details */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden p-6">
                 <EventPreview
                   event={{
                     id: event?.id || '',
@@ -966,6 +976,8 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
                     undecided: [],
                   }}
                   isPreview={true}
+                  hideMembers={true}
+                  hideImages={false}
                 />
               </div>
             </div>

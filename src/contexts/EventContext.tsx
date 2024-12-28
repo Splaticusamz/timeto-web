@@ -167,20 +167,20 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       throw new Error('No user logged in or no organization selected');
     }
 
-    const now = new Date().toISOString();
+    const now = Timestamp.now();
     const eventData: Event = {
       id: '', // Will be set by Firestore
       source: 'events' as const,
       title: data.title,
       description: data.description,
       start: data.start,
-      end: data.end || null, // Convert undefined to null for Firestore
+      end: data.end || null,
       timezone: data.timezone,
       location: data.location,
       visibility: data.visibility,
-      widgets: data.widgets.filter(w => w.isEnabled).map(w => w.type),
-      createdAt: new Date(now),
-      updatedAt: new Date(now),
+      widgets: data.widgets.filter(w => w.isEnabled),
+      createdAt: now.toDate(),
+      updatedAt: now.toDate(),
       owner: currentOrganization.id,
       organizationId: currentOrganization.id,
       status: data.status || 'draft',
@@ -201,20 +201,34 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       const docData = {
         ...eventData,
         id: docRef.id,
-        // Convert dates to Firestore Timestamps
+        // Convert dates to Firestore Timestamps consistently
         start: Timestamp.fromDate(data.start),
         end: data.end ? Timestamp.fromDate(data.end) : null,
-        createdAt: Timestamp.fromDate(new Date(now)),
-        updatedAt: Timestamp.fromDate(new Date(now)),
-        // Add widget configs
-        widgetConfigs: data.widgets.filter(w => w.isEnabled).reduce((acc, w) => ({
-          ...acc,
-          [w.type]: w.config || {}
-        }), {}),
+        createdAt: now,
+        updatedAt: now,
+        // Store widgets with their full configuration
+        widgets: data.widgets.filter(w => w.isEnabled).map(w => ({
+          id: w.id,
+          type: w.type,
+          isEnabled: true,
+          config: w.config || {},
+          data: w.data || {},
+          order: w.order || 0
+        }))
       };
+
       await setDoc(docRef, docData);
       
-      const newEvent = { ...eventData, id: docRef.id };
+      // Convert the timestamps back to dates for the returned event
+      const newEvent: Event = {
+        ...eventData,
+        id: docRef.id,
+        start: docData.start.toDate(),
+        end: docData.end ? docData.end.toDate() : null,
+        createdAt: docData.createdAt.toDate(),
+        updatedAt: docData.updatedAt.toDate()
+      };
+
       setEvents((prev) => [newEvent, ...prev]);
       return newEvent;
     } catch (err) {

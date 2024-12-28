@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useEvent } from '../../contexts/EventContext';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { Event } from '../../types/event';
-import { UserIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { UserIcon, UsersIcon, TrashIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 
 export function Events() {
   const navigate = useNavigate();
-  const { events } = useEvent();
+  const { events, deleteEvent, createEvent } = useEvent();
   const { currentOrganization } = useOrganization();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -22,6 +22,31 @@ export function Events() {
   const filteredPublicEvents = publicEvents.filter(event =>
     event.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleDelete = async (e: React.MouseEvent, event: Event) => {
+    e.stopPropagation();
+    if (window.confirm('Are you sure you want to delete this event?')) {
+      try {
+        await deleteEvent(event.id);
+      } catch (error) {
+        console.error('Failed to delete event:', error);
+      }
+    }
+  };
+
+  const handleDuplicate = async (e: React.MouseEvent, event: Event) => {
+    e.stopPropagation();
+    try {
+      const duplicateData = {
+        ...event,
+        title: `${event.title} (Copy)`,
+        status: 'draft'
+      };
+      await createEvent(duplicateData);
+    } catch (error) {
+      console.error('Failed to duplicate event:', error);
+    }
+  };
 
   const EventSection = ({ title, events, icon: Icon }: { title: string; events: Event[]; icon: any }) => (
     <>
@@ -38,14 +63,14 @@ export function Events() {
               <th className="w-[40%] py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
                 Title
               </th>
-              <th className="w-[20%] py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
+              <th className="w-[25%] py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
                 Date
               </th>
-              <th className="w-[20%] py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
+              <th className="w-[25%] py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
                 Time
               </th>
-              <th className="w-[20%] py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
-                Status
+              <th className="w-[10%] py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase text-left px-4">
+                Actions
               </th>
             </tr>
           </thead>
@@ -79,17 +104,22 @@ export function Events() {
                   }).toLowerCase()}
                 </td>
                 <td className="py-2 px-4">
-                  {event.status && (
-                    <span className={`px-2 py-1 text-xs rounded-full ${
-                      event.status === 'published' 
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : event.status === 'draft'
-                          ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                    }`}>
-                      {event.status}
-                    </span>
-                  )}
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={(e) => handleDuplicate(e, event)}
+                      className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      title="Duplicate event"
+                    >
+                      <DocumentDuplicateIcon className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={(e) => handleDelete(e, event)}
+                      className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                      title="Delete event"
+                    >
+                      <TrashIcon className="h-5 w-5" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

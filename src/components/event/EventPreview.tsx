@@ -26,6 +26,8 @@ interface EventPreviewProps {
   event: Event;
   isEditMode?: boolean;
   isPreview?: boolean;
+  hideMembers?: boolean;
+  hideImages?: boolean;
 }
 
 function AttendeeAvatar({ member: { id } }: { member: { id: string } }) {
@@ -92,7 +94,7 @@ function AttendeeAvatar({ member: { id } }: { member: { id: string } }) {
   );
 }
 
-export function EventPreview({ event, isPreview = false }: EventPreviewProps) {
+export function EventPreview({ event, isPreview = false, hideMembers = false, hideImages = false }: EventPreviewProps) {
   const formatLocation = () => {
     switch (event.location.type) {
       case 'organization':
@@ -179,48 +181,50 @@ export function EventPreview({ event, isPreview = false }: EventPreviewProps) {
   });
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-7xl mx-auto space-y-8">
       {/* Images section at the top */}
-      <div className="flex gap-4">
-        <div className="w-64 flex-shrink-0">
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Event Photo</h4>
-            <div className="relative w-full h-64 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10">
-              {event.photo ? (
-                <img
-                  src={event.photo}
-                  alt="Event Photo"
-                  className="w-full h-full object-cover"
-                  crossOrigin="anonymous"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                  <span className="text-sm">No photo uploaded</span>
-                </div>
-              )}
+      {!hideImages && (
+        <div className="flex gap-4">
+          <div className="w-64 flex-shrink-0">
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Event Photo</h4>
+              <div className="relative w-full h-64 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10">
+                {event.photo ? (
+                  <img
+                    src={event.photo}
+                    alt="Event Photo"
+                    className="w-full h-full object-cover"
+                    crossOrigin="anonymous"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                    <span className="text-sm">No photo uploaded</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex-1">
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Cover Image</h4>
+              <div className="relative w-full h-64 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10">
+                {event.coverImage ? (
+                  <img
+                    src={event.coverImage}
+                    alt="Event Cover"
+                    className="w-full h-full object-cover"
+                    crossOrigin="anonymous"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
+                    <span className="text-sm">No cover image uploaded</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-        <div className="flex-1">
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Cover Image</h4>
-            <div className="relative w-full h-64 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10">
-              {event.coverImage ? (
-                <img
-                  src={event.coverImage}
-                  alt="Event Cover"
-                  className="w-full h-full object-cover"
-                  crossOrigin="anonymous"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                  <span className="text-sm">No cover image uploaded</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-2 gap-8">
         {/* Event Details */}
@@ -345,87 +349,91 @@ export function EventPreview({ event, isPreview = false }: EventPreviewProps) {
           </div>
 
           {/* Attendees Section */}
-          <div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Attendees</h3>
-            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
-              <div className="space-y-4">
-                {/* Accepted attendees */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
-                    <span>Attending</span>
-                    <span className="text-xs text-gray-500">({event.accepted?.length || 0})</span>
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {event.accepted?.length > 0 ? (
-                      event.accepted.map((memberId) => (
-                        <AttendeeAvatar key={memberId} member={{ id: memberId }} />
-                      ))
-                    ) : (
-                      <span className="text-sm text-gray-500 dark:text-gray-400">No accepted members yet</span>
-                    )}
+          {!hideMembers && (
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Attendees</h3>
+              <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                <div className="space-y-4">
+                  {/* Accepted attendees */}
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                      <span>Attending</span>
+                      <span className="text-xs text-gray-500">({event.accepted?.length || 0})</span>
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {event.accepted?.length > 0 ? (
+                        event.accepted.map((memberId) => (
+                          <AttendeeAvatar key={memberId} member={{ id: memberId }} />
+                        ))
+                      ) : (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">No accepted members yet</span>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Maybe/Undecided attendees */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
-                    <span>Maybe</span>
-                    <span className="text-xs text-gray-500">({event.undecided?.length || 0})</span>
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {event.undecided?.length > 0 ? (
-                      event.undecided.map((memberId) => (
-                        <AttendeeAvatar key={memberId} member={{ id: memberId }} />
-                      ))
-                    ) : (
-                      <span className="text-sm text-gray-500 dark:text-gray-400">No undecided members</span>
-                    )}
+                  {/* Maybe/Undecided attendees */}
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                      <span>Maybe</span>
+                      <span className="text-xs text-gray-500">({event.undecided?.length || 0})</span>
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {event.undecided?.length > 0 ? (
+                        event.undecided.map((memberId) => (
+                          <AttendeeAvatar key={memberId} member={{ id: memberId }} />
+                        ))
+                      ) : (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">No undecided members</span>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Pending attendees */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
-                    <span>Pending</span>
-                    <span className="text-xs text-gray-500">({event.attendees?.length || 0})</span>
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {event.attendees?.length > 0 ? (
-                      event.attendees.map((memberId) => (
-                        <AttendeeAvatar key={memberId} member={{ id: memberId }} />
-                      ))
-                    ) : (
-                      <span className="text-sm text-gray-500 dark:text-gray-400">No pending members</span>
-                    )}
+                  {/* Pending attendees */}
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                      <span>Pending</span>
+                      <span className="text-xs text-gray-500">({event.attendees?.length || 0})</span>
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {event.attendees?.length > 0 ? (
+                        event.attendees.map((memberId) => (
+                          <AttendeeAvatar key={memberId} member={{ id: memberId }} />
+                        ))
+                      ) : (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">No pending members</span>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Declined attendees */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
-                    <span>Declined</span>
-                    <span className="text-xs text-gray-500">({event.declined?.length || 0})</span>
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {event.declined?.length > 0 ? (
-                      event.declined.map((memberId) => (
-                        <AttendeeAvatar key={memberId} member={{ id: memberId }} />
-                      ))
-                    ) : (
-                      <span className="text-sm text-gray-500 dark:text-gray-400">No declined members</span>
-                    )}
+                  {/* Declined attendees */}
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">
+                      <span>Declined</span>
+                      <span className="text-xs text-gray-500">({event.declined?.length || 0})</span>
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {event.declined?.length > 0 ? (
+                        event.declined.map((memberId) => (
+                          <AttendeeAvatar key={memberId} member={{ id: memberId }} />
+                        ))
+                      ) : (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">No declined members</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Members Section */}
-      <div className="border-t pt-6">
-        <EventMembers eventId={event.id} />
-      </div>
+      {!hideMembers && (
+        <div className="border-t pt-6">
+          <EventMembers eventId={event.id} />
+        </div>
+      )}
     </div>
   );
 } 

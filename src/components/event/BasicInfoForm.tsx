@@ -266,24 +266,6 @@ export function BasicInfoForm({ data, onChange }: BasicInfoFormProps) {
         </div>
       )}
 
-      <div>
-        <label htmlFor="timezone" className={formClasses.label}>
-          Timezone
-        </label>
-        <select
-          id="timezone"
-          value={data.timezone}
-          onChange={(e) => handleChange('timezone', e.target.value)}
-          className={formClasses.select}
-        >
-          {COMMON_TIMEZONES.map((tz) => (
-            <option key={tz} value={tz}>
-              {tz}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <div className="pt-2">
         <Switch.Group>
           <div className="flex items-center justify-between">
