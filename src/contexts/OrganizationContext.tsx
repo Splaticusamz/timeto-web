@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, Timestamp, deleteDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, Timestamp, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from './AuthContext';
-import { Organization, CreateOrganizationData, OrgMemberRole, UserRoles } from '../types/organization';
+import { Organization, CreateOrganizationData, OrgMemberRole, UserRoles, Member } from '../types/organization';
 import { useNavigate } from 'react-router-dom';
 
 interface OrganizationWithEventCount extends Organization {
@@ -23,6 +23,9 @@ interface OrganizationContextType {
   isSystemAdmin: () => boolean;
   canCreateOrganization: () => boolean;
   canCreateSubOrganization: (parentOrgId: string) => boolean;
+  assignMemberToOrganization: (userId: string, organizationId: string, role: OrgMemberRole) => Promise<void>;
+  loadOrganizationMembers: (organizationId: string) => Promise<Member[]>;
+  removeMemberFromOrganization: (userId: string, organizationId: string) => Promise<void>;
 }
 
 const OrganizationContext = createContext<OrganizationContextType | null>(null);
@@ -365,6 +368,74 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     );
   };
 
+  const assignMemberToOrganization = async (
+    userId: string, 
+    organizationId: string, 
+    role: OrgMemberRole
+  ) => {
+    const memberRef = doc(db, 'organizations', organizationId, 'members', userId);
+    await setDoc(memberRef, {
+      role,
+      addedBy: currentUser.uid,
+      addedAt: serverTimestamp(),
+      status: 'active'
+    });
+    
+    // Update user's organizations record
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      [`organizations.${organizationId}`]: role
+    });
+  };
+
+  const loadOrganizationMembers = async (organizationId: string): Promise<Member[]> => {
+    if (!currentUser) throw new Error('User must be authenticated');
+
+    try {
+      const membersRef = collection(db, 'organizations', organizationId, 'members');
+      const membersSnapshot = await getDocs(membersRef);
+      
+      const memberPromises = membersSnapshot.docs.map(async (doc) => {
+        const userDoc = await getDoc(doc(db, 'users', doc.id));
+        const userData = userDoc.data();
+        return {
+          id: doc.id,
+          firstName: userData?.firstName || '',
+          lastName: userData?.lastName || '',
+          email: userData?.email || '',
+          role: doc.data().role as OrgMemberRole,
+        };
+      });
+
+      return await Promise.all(memberPromises);
+    } catch (err) {
+      console.error('Failed to load organization members:', err);
+      throw new Error('Failed to load organization members');
+    }
+  };
+
+  const removeMemberFromOrganization = async (userId: string, organizationId: string) => {
+    if (!currentUser) throw new Error('User must be authenticated');
+    
+    try {
+      // Remove from organization members
+      await deleteDoc(doc(db, 'organizations', organizationId, 'members', userId));
+      
+      // Remove from user's organizations
+      const userRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const updatedOrgs = { ...userData.organizations };
+        delete updatedOrgs[organizationId];
+        await updateDoc(userRef, { organizations: updatedOrgs });
+      }
+    } catch (err) {
+      console.error('Failed to remove member:', err);
+      throw new Error('Failed to remove member from organization');
+    }
+  };
+
   const value = {
     currentOrganization,
     userOrganizations,
@@ -379,6 +450,9 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     isSystemAdmin,
     canCreateOrganization,
     canCreateSubOrganization,
+    assignMemberToOrganization,
+    loadOrganizationMembers,
+    removeMemberFromOrganization,
   };
 
   return (

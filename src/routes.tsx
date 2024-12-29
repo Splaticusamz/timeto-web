@@ -8,6 +8,7 @@ import { Login } from './pages/auth/Login';
 import { Register } from './pages/auth/Register';
 import { Calendar } from './pages/calendar/Calendar';
 import { EventDetails } from './pages/event/EventDetails';
+import { MemberManagement } from './pages/admin/MemberManagement';
 
 export const router = createBrowserRouter([
   {
@@ -33,6 +34,10 @@ export const router = createBrowserRouter([
       {
         path: 'organizations/profile',
         element: <Profile />,
+      },
+      {
+        path: 'admin/organizations/:organizationId/members',
+        element: <MemberManagement />,
       },
       {
         path: 'events',

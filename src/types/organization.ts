@@ -67,4 +67,12 @@ export interface CreateOrganizationData {
     allowSubOrganizations: boolean;
     maxSubOrganizations: number;
   };
+}
+
+export interface Member {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: OrgMemberRole;
 } 
