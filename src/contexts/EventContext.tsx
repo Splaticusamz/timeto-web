@@ -139,6 +139,12 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
             accepted: Array.isArray(data.accepted) ? data.accepted : [],
             declined: Array.isArray(data.declined) ? data.declined : [],
             undecided: Array.isArray(data.undecided) ? data.undecided : [],
+            notificationSettings: data.notificationSettings ? {
+              enabled: Boolean(data.notificationSettings.enabled) || false,
+              reminderTimes: Array.isArray(data.notificationSettings.reminderTimes) 
+                ? data.notificationSettings.reminderTimes 
+                : []
+            } : null,
           } as Event;
         }),
         ...publicEvents.docs.map(doc => {
@@ -184,6 +190,12 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
             accepted: Array.isArray(data.accepted) ? data.accepted : [],
             declined: Array.isArray(data.declined) ? data.declined : [],
             undecided: Array.isArray(data.undecided) ? data.undecided : [],
+            notificationSettings: data.notificationSettings ? {
+              enabled: Boolean(data.notificationSettings.enabled) || false,
+              reminderTimes: Array.isArray(data.notificationSettings.reminderTimes) 
+                ? data.notificationSettings.reminderTimes 
+                : []
+            } : null,
           } as Event;
         })
       ];
@@ -197,8 +209,11 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
   }, [currentUser, currentOrganization]);
 
   useEffect(() => {
+    if (!currentUser || !currentOrganization) return;
+    
+    // Load events once when component mounts or when user/org changes
     loadEvents();
-  }, [loadEvents, currentOrganization?.id]);
+  }, [currentUser, currentOrganization, loadEvents]);
 
   const createEvent = useCallback(async (data: CreateEventData): Promise<Event> => {
     if (!currentUser || !currentOrganization) {
@@ -261,6 +276,22 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       };
 
       setEvents((prev) => [newEvent, ...prev]);
+
+      // If notifications are enabled, create scheduled notifications
+      if (data.notificationSettings?.enabled) {
+        const scheduledNotificationsRef = collection(db, 'scheduledNotifications');
+        
+        for (const timeBeforeEvent of data.notificationSettings.reminderTimes) {
+          await setDoc(doc(scheduledNotificationsRef), {
+            owner: currentUser.uid,
+            eventId: docRef.id,
+            timeBeforeEvent,
+            nextNotification: new Date(data.start.getTime() - timeBeforeEvent * 60000),
+            recurrenceId: data.recurrence ? recurrenceRef.id : null
+          });
+        }
+      }
+
       return newEvent;
     } catch (err) {
       console.error('Failed to create event:', err);
@@ -269,12 +300,13 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
   }, [currentUser, currentOrganization]);
 
   const updateEvent = useCallback(async (id: string, data: UpdateEventData): Promise<Event> => {
-    if (!currentUser) {
-      throw new Error('No user logged in');
+    console.log('EventContext updateEvent called with:', { id, data });
+    
+    if (!currentUser || !currentOrganization) {
+      throw new Error('No user logged in or no organization selected');
     }
 
     try {
-      // Try to find the event in both collections
       const [privateDoc, publicDoc] = await Promise.all([
         getDoc(doc(db, 'events', id)),
         getDoc(doc(db, 'publicEvents', id))
@@ -288,108 +320,65 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       }
 
       const currentData = eventDoc.data();
-      const updatedData: any = {
-        updatedAt: Timestamp.now()
+      const now = Timestamp.now();
+      
+      // Prepare the update data with special handling for notification settings
+      const updatedData = {
+        ...data,
+        updatedAt: now,
+        organizationId: currentOrganization.id,
       };
 
-      // Only include fields that are actually being updated
-      Object.keys(data).forEach(key => {
-        if (data[key] !== undefined) {
-          updatedData[key] = data[key];
-        }
-      });
-
-      // Handle special cases for dates
-      if (data.start instanceof Date) {
-        updatedData.start = Timestamp.fromDate(data.start);
-      } else if (data.start && typeof data.start === 'object' && 'seconds' in data.start) {
-        updatedData.start = new Timestamp(data.start.seconds, data.start.nanoseconds || 0);
-      }
-      
-      if (data.end instanceof Date) {
-        updatedData.end = Timestamp.fromDate(data.end);
-      } else if (data.end && typeof data.end === 'object' && 'seconds' in data.end) {
-        updatedData.end = new Timestamp(data.end.seconds, data.end.nanoseconds || 0);
-      }
-
-      // Handle widgets if they're being updated
-      if (data.widgets) {
-        updatedData.widgets = data.widgets
-          .filter(w => w.isEnabled !== false)
-          .map(w => w.type);
-      }
-
-      // Check if visibility is changing and requires moving to a different collection
-      const targetCollection = (data.visibility === 'public') ? 'publicEvents' : 'events';
-      
-      if (targetCollection !== currentCollection) {
-        // Create the event in the new collection
-        const newDocRef = doc(collection(db, targetCollection));
-        
-        // Prepare the full event data for the new document
-        const fullEventData = {
-          ...currentData,
-          ...updatedData,
-          id: newDocRef.id,
-          source: targetCollection as EventSource,
+      // Special handling for notification settings
+      if (data.notificationSettings) {
+        updatedData.notificationSettings = {
+          enabled: Boolean(data.notificationSettings.enabled),
+          reminderTimes: Array.isArray(data.notificationSettings.reminderTimes) 
+            ? data.notificationSettings.reminderTimes 
+            : []
         };
-
-        // Delete from old collection and create in new collection
-        await Promise.all([
-          deleteDoc(doc(db, currentCollection, id)),
-          setDoc(newDocRef, fullEventData)
-        ]);
-
-        // Construct the updated event
-        const updatedEvent: Event = {
-          ...currentData,
-          ...data,
-          id: newDocRef.id,
-          source: targetCollection as EventSource,
-          updatedAt: updatedData.updatedAt.toDate(),
-          start: updatedData.start ? updatedData.start.toDate() : currentData.start.toDate(),
-          end: updatedData.end ? updatedData.end.toDate() : currentData.end?.toDate(),
-          widgets: updatedData.widgets || currentData.widgets
-        };
-
-        // Update local state and trigger a reload
-        setEvents(prev => prev.map(event => 
-          event.id === id ? updatedEvent : event
-        ));
-
-        // Reload events to ensure consistency
-        await loadEvents();
-
-        return updatedEvent;
       }
 
-      // If visibility isn't changing, just update the current document
+      console.log('Data being saved to Firestore:', updatedData);
+
+      // Update the event document
       const eventRef = doc(db, currentCollection, id);
       await updateDoc(eventRef, updatedData);
 
-      // Construct the updated event
-      const updatedEvent: Event = {
+      // Fetch the latest data after update
+      const updatedDoc = await getDoc(eventRef);
+      const updatedDocData = updatedDoc.data();
+
+      // Create the updated event object with proper handling of all fields
+      const updatedEvent = {
         ...currentData,
-        ...data,
+        ...updatedDocData,
         id,
+        organizationId: currentOrganization.id,
         source: currentCollection as EventSource,
-        updatedAt: updatedData.updatedAt.toDate(),
-        start: updatedData.start ? updatedData.start.toDate() : currentData.start.toDate(),
-        end: updatedData.end ? updatedData.end.toDate() : currentData.end?.toDate(),
-        widgets: updatedData.widgets || currentData.widgets
+        updatedAt: now.toDate(),
+        start: updatedDocData.start ? convertTimestamp(updatedDocData.start) : currentData.start,
+        end: updatedDocData.end ? convertTimestamp(updatedDocData.end) : currentData.end,
+        createdAt: convertTimestamp(currentData.createdAt),
+        notificationSettings: updatedDocData.notificationSettings ? {
+          enabled: Boolean(updatedDocData.notificationSettings.enabled),
+          reminderTimes: Array.isArray(updatedDocData.notificationSettings.reminderTimes)
+            ? updatedDocData.notificationSettings.reminderTimes
+            : []
+        } : null
       };
 
-      // Update the local state
-      setEvents((prev) =>
-        prev.map((event) => (event.id === id ? updatedEvent : event))
-      );
+      // Update local state
+      setEvents(prev => prev.map(event => 
+        event.id === id ? updatedEvent : event
+      ));
 
       return updatedEvent;
     } catch (err) {
       console.error('Update event error:', err);
       throw new Error('Failed to update event');
     }
-  }, [currentUser, loadEvents]);
+  }, [currentUser, currentOrganization]);
 
   const deleteEvent = useCallback(async (id: string): Promise<void> => {
     if (!currentUser) {
@@ -420,17 +409,6 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Failed to save draft');
     }
   }, [currentUser]);
-
-  // Add an effect to refresh events periodically
-  useEffect(() => {
-    if (!currentUser || !currentOrganization) return;
-
-    const refreshInterval = setInterval(() => {
-      loadEvents();
-    }, 30000); // Refresh every 30 seconds
-
-    return () => clearInterval(refreshInterval);
-  }, [currentUser, currentOrganization, loadEvents]);
 
   const value = {
     events,

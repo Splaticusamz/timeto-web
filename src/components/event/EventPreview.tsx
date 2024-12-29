@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Event, Widget, LocationType, EventLocation } from '../../types/event';
+import { Event, Widget, LocationType, EventLocation, NotificationSettings } from '../../types/event';
 import { getWidgetDefinition } from './widgets/WidgetRegistry';
 import { 
   PhoneIcon, 
@@ -18,6 +18,10 @@ import {
   PencilIcon,
   XMarkIcon,
   HandThumbUpIcon,
+  BellIcon,
+  BellSlashIcon,
+  PlusIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
 import { useEvent } from '../../contexts/EventContext';
@@ -192,6 +196,8 @@ function EditableField({ label, value, onSave, isEditing, onEdit, onCancel, type
         setDateValue('');
         setTimeValue('');
       }
+      // Clear editing state after successful save
+      onCancel(); // This will call setEditingField(null)
     } catch (error) {
       console.error('Failed to save:', error);
       setError('Failed to save changes');
@@ -310,26 +316,45 @@ function EditableField({ label, value, onSave, isEditing, onEdit, onCancel, type
   );
 }
 
-export function EventPreview({ event, isEditMode = false, isPreview = false, hideMembers = false, hideImages = false }: EventPreviewProps) {
+export function EventPreview({ event: initialEvent, isEditMode = false, ...props }: EventPreviewProps) {
   const { updateEvent } = useEvent();
+  const [event, setEvent] = useState<Event>(initialEvent);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [coverImageUploading, setCoverImageUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isAddingNotification, setIsAddingNotification] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(-1);
+  const [newNotification, setNewNotification] = useState({ value: 5, unit: 'minutes' });
+  const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
+
+  // Update the useEffect to properly sync with initialEvent changes
+  useEffect(() => {
+    console.log('Initial event updated:', initialEvent);
+    setEvent(initialEvent);
+  }, [initialEvent]);
 
   const handleFieldEdit = (field: string) => {
     setEditingField(field);
   };
 
-  const handleFieldSave = async (field: string, value: string) => {
+  const handleFieldSave = async (field: string, value: any): Promise<Event> => {
+    console.log('handleFieldSave called with:', { field, value });
+    
     try {
-      const updateData = field === 'location' 
-        ? { location: { ...event.location, address: value } }
-        : { [field]: value };
-        
-      await updateEvent(event.id, updateData);
-      setEditingField(null);
+      if (field === 'notificationSettings') {
+        const updatedEvent = await updateEvent(event.id, {
+          notificationSettings: value
+        });
+        console.log('Update response:', updatedEvent);
+        return updatedEvent;
+      } else {
+        const updatedEvent = await updateEvent(event.id, { [field]: value });
+        return updatedEvent;
+      }
     } catch (error) {
       console.error('Failed to update field:', error);
+      throw error;
     }
   };
 
@@ -517,7 +542,7 @@ export function EventPreview({ event, isEditMode = false, isPreview = false, hid
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Images section at the top */}
-      {!hideImages && (
+      {!props.hideImages && (
         <div className="flex gap-4">
           <div className="w-64 flex-shrink-0">
             <div className="space-y-2">
@@ -636,7 +661,9 @@ export function EventPreview({ event, isEditMode = false, isPreview = false, hid
                   />
                   <EditableField
                     label="Visibility"
-                    value={event.visibility}
+                    value={event.visibility === 'organization' ? 'Organization Members' :
+                           event.visibility === 'invite-only' ? 'Invite Only' :
+                           'Public'}
                     onSave={handleVisibilitySave}
                     isEditing={editingField === 'visibility'}
                     onEdit={() => handleFieldEdit('visibility')}
@@ -660,6 +687,296 @@ export function EventPreview({ event, isEditMode = false, isPreview = false, hid
                       </dd>
                     </div>
                   )}
+                  <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 flex items-center space-x-2">
+                      <BellIcon className="h-5 w-5" />
+                      <span>Notifications</span>
+                    </dt>
+                    <dd className="mt-3 text-sm text-gray-900 dark:text-gray-100">
+                      <div className="space-y-3">
+                        {/* View Mode - List of existing notifications */}
+                        {(event.notificationSettings?.reminderTimes || []).map((time, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-white dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+                            {editingIndex === index ? (
+                              // Edit Mode
+                              <div className="flex-1 flex items-center space-x-2">
+                                <select
+                                  value={time >= 1440 ? time / 1440 : time >= 60 ? time / 60 : time}
+                                  onChange={(e) => {
+                                    const newTimes = [...(event.notificationSettings?.reminderTimes || [])];
+                                    const value = parseInt(e.target.value);
+                                    const multiplier = time >= 1440 ? 1440 : time >= 60 ? 60 : 1;
+                                    newTimes[index] = value * multiplier;
+                                    setEvent(prevEvent => ({
+                                      ...prevEvent,
+                                      notificationSettings: {
+                                        enabled: true,
+                                        reminderTimes: newTimes
+                                      }
+                                    }));
+                                  }}
+                                  className="w-24 rounded-md border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 px-3 py-1.5"
+                                >
+                                  {time >= 1440 ? (
+                                    Array.from({ length: 7 }, (_, i) => i + 1).map(num => (
+                                      <option key={num} value={num}>{num}</option>
+                                    ))
+                                  ) : time >= 60 ? (
+                                    Array.from({ length: 12 }, (_, i) => i + 1).map(num => (
+                                      <option key={num} value={num}>{num}</option>
+                                    ))
+                                  ) : (
+                                    [5, 10, 15, 30, 45].map(num => (
+                                      <option key={num} value={num}>{num}</option>
+                                    ))
+                                  )}
+                                </select>
+                                <select
+                                  value={time >= 1440 ? 'days' : time >= 60 ? 'hours' : 'minutes'}
+                                  onChange={(e) => {
+                                    const newTimes = [...(event.notificationSettings?.reminderTimes || [])];
+                                    const currentValue = time >= 1440 ? time / 1440 : time >= 60 ? time / 60 : time;
+                                    const multiplier = e.target.value === 'days' ? 1440 : e.target.value === 'hours' ? 60 : 1;
+                                    newTimes[index] = currentValue * multiplier;
+                                    setEvent(prevEvent => ({
+                                      ...prevEvent,
+                                      notificationSettings: {
+                                        enabled: true,
+                                        reminderTimes: newTimes
+                                      }
+                                    }));
+                                  }}
+                                  className="rounded-md border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 px-3 py-1.5"
+                                >
+                                  <option value="minutes">minutes</option>
+                                  <option value="hours">hours</option>
+                                  <option value="days">days</option>
+                                </select>
+                                <span className="text-gray-500 dark:text-gray-400">before event</span>
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={async () => {
+                                      if (isSaving) return;
+                                      try {
+                                        setIsSaving(true);
+                                        await handleFieldSave('notificationSettings', {
+                                          enabled: true,
+                                          reminderTimes: event.notificationSettings?.reminderTimes || []
+                                        });
+                                        // Clear editing state after successful save
+                                        setEditingIndex(-1);
+                                        setEditingField(null);
+                                      } catch (error) {
+                                        console.error('Failed to save notification settings:', error);
+                                        setEvent(initialEvent);
+                                      } finally {
+                                        setIsSaving(false);
+                                      }
+                                    }}
+                                    className={`p-1 ${isSaving ? 'text-gray-400 cursor-not-allowed' : 'text-green-600 hover:text-green-700'}`}
+                                    disabled={isSaving}
+                                  >
+                                    {isSaving ? (
+                                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+                                    ) : (
+                                      <HandThumbUpIcon className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                  {!isSaving && (
+                                    <button
+                                      onClick={() => {
+                                        setEvent(initialEvent);
+                                        setEditingIndex(-1);
+                                      }}
+                                      className="p-1 text-red-600 hover:text-red-700"
+                                    >
+                                      <XMarkIcon className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              // View Mode
+                              <>
+                                <span className="text-gray-700 dark:text-gray-300">
+                                  {time >= 1440 
+                                    ? `${time / 1440} day${time / 1440 > 1 ? 's' : ''}`
+                                    : time >= 60 
+                                      ? `${time / 60} hour${time / 60 > 1 ? 's' : ''}`
+                                      : `${time} minute${time > 1 ? 's' : ''}`
+                                  } before event
+                                </span>
+                                <div className="flex items-center space-x-2">
+                                  {deletingIndex === index ? (
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent dark:border-red-400 dark:border-t-transparent" />
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={() => setEditingIndex(index)}
+                                        className="p-1 text-gray-400 hover:text-blue-500"
+                                      >
+                                        <PencilIcon className="h-4 w-4" />
+                                      </button>
+                                      <button
+                                        onClick={async () => {
+                                          try {
+                                            setDeletingIndex(index);
+                                            const newTimes = event.notificationSettings?.reminderTimes.filter((_, i) => i !== index) || [];
+                                            await handleFieldSave('notificationSettings', {
+                                              enabled: newTimes.length > 0,
+                                              reminderTimes: newTimes
+                                            });
+                                          } catch (error) {
+                                            console.error('Failed to delete notification:', error);
+                                            setEvent(initialEvent);
+                                          } finally {
+                                            setDeletingIndex(null);
+                                          }
+                                        }}
+                                        className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                                        title="Remove notification"
+                                      >
+                                        <TrashIcon className="h-4 w-4" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Add New Notification */}
+                        {isAddingNotification && (
+                          <div className="flex items-center space-x-2 p-2 bg-white dark:bg-gray-700 rounded-md border border-gray-200 dark:border-gray-600">
+                            <div className="flex-1 flex items-center space-x-2">
+                              <select
+                                value={newNotification.value}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value);
+                                  if (isNaN(value)) return;
+                                  
+                                  // Debug log to verify value being set
+                                  console.log('Setting notification value:', value);
+                                  
+                                  setNewNotification(prev => ({
+                                    ...prev,
+                                    value
+                                  }));
+                                }}
+                                className="w-24 rounded-md border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 px-3 py-1.5"
+                              >
+                                {newNotification.unit === 'days' ? (
+                                  Array.from({ length: 7 }, (_, i) => i + 1).map(num => (
+                                    <option key={num} value={num}>{num}</option>
+                                  ))
+                                ) : newNotification.unit === 'hours' ? (
+                                  Array.from({ length: 12 }, (_, i) => i + 1).map(num => (
+                                    <option key={num} value={num}>{num}</option>
+                                  ))
+                                ) : (
+                                  [5, 10, 15, 30, 45].map(num => (
+                                    <option key={num} value={num}>{num}</option>
+                                  ))
+                                )}
+                              </select>
+                              <select
+                                value={newNotification.unit}
+                                onChange={(e) => {
+                                  setNewNotification({
+                                    value: 1,
+                                    unit: e.target.value as 'minutes' | 'hours' | 'days'
+                                  });
+                                }}
+                                className="rounded-md border-gray-300 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-100 px-3 py-1.5"
+                              >
+                                <option value="minutes">minutes</option>
+                                <option value="hours">hours</option>
+                                <option value="days">days</option>
+                              </select>
+                              <span className="text-gray-500 dark:text-gray-400">before event</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={async () => {
+                                  if (isSaving) return;
+                                  try {
+                                    setIsSaving(true);
+                                    // Calculate minutes based on selected value and unit
+                                    const multiplier = newNotification.unit === 'days' ? 1440 : 
+                                                     newNotification.unit === 'hours' ? 60 : 1;
+                                    const minutes = newNotification.value * multiplier;
+                                    
+                                    // Debug log to verify calculation
+                                    console.log('Adding notification:', {
+                                      value: newNotification.value,
+                                      unit: newNotification.unit,
+                                      multiplier,
+                                      minutes
+                                    });
+                                    
+                                    // Check if this notification already exists
+                                    const existingTimes = event.notificationSettings?.reminderTimes || [];
+                                    if (existingTimes.includes(minutes)) {
+                                      console.error('This notification already exists');
+                                      return;
+                                    }
+                                    
+                                    // Create new array with sorted times
+                                    const newTimes = [...existingTimes, minutes].sort((a, b) => a - b);
+                                    
+                                    // Save to database
+                                    await handleFieldSave('notificationSettings', {
+                                      enabled: true,
+                                      reminderTimes: newTimes
+                                    });
+                                    
+                                    setIsAddingNotification(false);
+                                    setNewNotification({ value: 5, unit: 'minutes' }); // Reset to default values
+                                  } catch (error) {
+                                    console.error('Failed to save notification settings:', error);
+                                    setEvent(initialEvent);
+                                  } finally {
+                                    setIsSaving(false);
+                                  }
+                                }}
+                                className={`p-1 ${isSaving ? 'text-gray-400 cursor-not-allowed' : 'text-green-600 hover:text-green-700'}`}
+                                disabled={isSaving}
+                              >
+                                {isSaving ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+                                ) : (
+                                  <HandThumbUpIcon className="h-4 w-4" />
+                                )}
+                              </button>
+                              {!isSaving && (
+                                <button
+                                  onClick={() => {
+                                    setIsAddingNotification(false);
+                                    setNewNotification({ value: 5, unit: 'minutes' });
+                                  }}
+                                  className="p-1 text-red-600 hover:text-red-700"
+                                >
+                                  <XMarkIcon className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Add Notification Button */}
+                        {!isAddingNotification && !editingField && (
+                          <button
+                            onClick={() => setIsAddingNotification(true)}
+                            className="flex items-center space-x-1.5 text-sm text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400 font-medium"
+                          >
+                            <PlusIcon className="h-4 w-4" />
+                            <span>Add notification</span>
+                          </button>
+                        )}
+                      </div>
+                    </dd>
+                  </div>
                 </>
               ) : (
                 <>
@@ -705,6 +1022,37 @@ export function EventPreview({ event, isEditMode = false, isPreview = false, hid
                       {event.visibility === 'organization' ? 'Organization Members' :
                        event.visibility === 'invite-only' ? 'Invite Only' :
                        'Public'}
+                    </dd>
+                  </div>
+                  <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Notifications</dt>
+                    <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                      {event.notificationSettings?.enabled ? (
+                        <div>
+                          <div className="flex items-center text-green-600">
+                            <BellIcon className="h-4 w-4 mr-1" />
+                            Enabled
+                          </div>
+                          <div className="mt-1">
+                            Reminders set for:
+                            <ul className="list-disc list-inside ml-2">
+                              {(event.notificationSettings.reminderTimes || []).map((time, index) => (
+                                <li key={index}>
+                                  {time >= 60 
+                                    ? `${time / 60} hour${time / 60 !== 1 ? 's' : ''}`
+                                    : `${time} minute${time !== 1 ? 's' : ''}`
+                                  } before event
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center text-gray-500">
+                          <BellSlashIcon className="h-4 w-4 mr-1" />
+                          No Notifications
+                        </div>
+                      )}
                     </dd>
                   </div>
                 </>
@@ -774,7 +1122,7 @@ export function EventPreview({ event, isEditMode = false, isPreview = false, hid
           </div>
 
           {/* Attendees Section */}
-          {!hideMembers && (
+          {!props.hideMembers && (
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Attendees</h3>
               <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
@@ -854,7 +1202,7 @@ export function EventPreview({ event, isEditMode = false, isPreview = false, hid
       </div>
 
       {/* Members Section */}
-      {!hideMembers && (
+      {!props.hideMembers && (
         <div className="border-t pt-6">
           <EventMembers eventId={event.id} />
         </div>

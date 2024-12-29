@@ -52,6 +52,15 @@ export interface Event {
   accepted?: string[];
   declined?: string[];
   undecided?: string[];
+  notificationSettings?: {
+    enabled: boolean;
+    reminderTimes: number[];
+  };
+}
+
+export interface NotificationSettings {
+  reminderTimes: number[]; // Minutes before event
+  enabled: boolean;
 }
 
 export interface CreateEventData {
@@ -71,6 +80,7 @@ export interface CreateEventData {
   website?: string;
   coverImage?: string;
   logoImage?: string;
+  notificationSettings?: NotificationSettings;
 }
 
 export interface UpdateEventData {
@@ -90,6 +100,7 @@ export interface UpdateEventData {
   website?: string;
   coverImage?: string;
   logoImage?: string;
+  notificationSettings?: NotificationSettings;
 }
 
 export interface EventDraft {

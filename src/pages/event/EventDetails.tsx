@@ -12,7 +12,7 @@ export function EventDetails() {
   const event = events.find(e => e.id === id);
   
   if (!event) {
-    return <div>Event not found</div>;
+    return <div>Please Stand By...</div>;
   }
 
   return (

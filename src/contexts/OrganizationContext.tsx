@@ -120,6 +120,9 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         setLoading(true);
         setError(null);
 
+        // Get the last selected organization ID from localStorage
+        const lastSelectedOrgId = localStorage.getItem(`lastOrg_${currentUser.uid}`);
+
         let querySnapshot;
         if (userRoles?.systemRole === 'system_admin') {
           // System admin sees all organizations
@@ -132,6 +135,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
           );
           querySnapshot = await getDocs(orgsQuery);
         }
+
         const orgs: Organization[] = [];
         querySnapshot.forEach((doc) => {
           const data = doc.data();
@@ -145,25 +149,18 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
 
         const orgsWithCounts = await loadEventCounts(orgs);
         setUserOrganizations(orgsWithCounts);
-        
-        // Try to restore the last selected organization from localStorage
-        const lastSelectedOrgId = localStorage.getItem(`lastOrg_${currentUser.uid}`);
-        const lastPath = localStorage.getItem(`lastPath_${currentUser.uid}`);
-        
+
+        // If we have a lastSelectedOrgId and it exists in the loaded organizations
         if (lastSelectedOrgId) {
           const lastOrg = orgsWithCounts.find(org => org.id === lastSelectedOrgId);
           if (lastOrg) {
             setCurrentOrganization(lastOrg);
-            // Use React Router navigation instead of window.location
-            if (lastPath && window.location.pathname === '/') {
-              navigate(lastPath);
-            }
-            return;
+            return; // Exit early if we found and set the last organization
           }
         }
-        
-        // If no stored organization or it's not found, default to the first one
-        if (orgsWithCounts.length > 0) {
+
+        // Only set to first org if we don't have a current organization
+        if (!currentOrganization && orgsWithCounts.length > 0) {
           setCurrentOrganization(orgsWithCounts[0]);
         }
       } catch (err) {
@@ -174,10 +171,8 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    if (currentUser) {
-      loadUserOrganizations();
-    }
-  }, [currentUser, navigate]);
+    loadUserOrganizations();
+  }, [currentUser, userRoles]); // Remove currentOrganization from dependencies
 
   const createOrganization = async (data: CreateOrganizationData): Promise<OrganizationWithEventCount> => {
     if (!currentUser || !userRoles) throw new Error('User must be authenticated');
