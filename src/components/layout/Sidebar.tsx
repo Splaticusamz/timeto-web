@@ -1,6 +1,6 @@
 import { Fragment } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { XMarkIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon, ArrowRightOnRectangleIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -66,17 +66,18 @@ export function Sidebar({ show, onClose }: SidebarProps) {
               <ul role="list" className="-mx-2 mt-2 space-y-1">
                 <li>
                   <Link
-                    to="/events"
+                    to="/organizations/profile"
                     className={`
-                      group flex gap-x-3 rounded-md p-2 text-sm leading-6
+                      group flex items-center gap-x-3 rounded-md p-2 text-sm leading-6
                       ${
-                        location.pathname === '/events'
+                        location.pathname === '/organizations/profile'
                           ? 'bg-gray-50 dark:bg-gray-800 text-primary-600 dark:text-primary-400'
                           : 'text-gray-700 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800'
                       }
                     `}
                   >
-                    {currentOrganization.name}
+                    <span className="flex-1">{currentOrganization.name}</span>
+                    <QuestionMarkCircleIcon className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:text-gray-300 dark:group-hover:text-gray-100" />
                   </Link>
                 </li>
                 <li>

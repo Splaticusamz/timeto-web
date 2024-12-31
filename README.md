@@ -1,4 +1,4 @@
-# TimeTo Web
+<!-- # TimeTo Web
 
 A web application for managing events and organizations, built with React, Firebase, and TailwindCSS.
 
@@ -236,4 +236,4 @@ The app expects the following collections:
    - The local-backup directory contains all necessary test data
    - No need to set up Firebase Web App for emulator development
    - Ensure emulators are running before running setup-auth.js
-   - Use --export-on-exit=local-backup to persist your changes
+   - Use --export-on-exit=local-backup to persist your changes -->

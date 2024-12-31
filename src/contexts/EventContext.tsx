@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
 import { useOrganization } from './OrganizationContext';
 import { Event, CreateEventData, UpdateEventData, EventStatus, EventSource } from '../types/event';
@@ -220,35 +220,43 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
       throw new Error('No user logged in or no organization selected');
     }
 
-    const now = Timestamp.now();
-    const eventData: Event = {
-      id: '', // Will be set by Firestore
-      source: 'events' as const,
-      title: data.title,
-      description: data.description,
-      start: data.start,
-      end: data.end || null,
-      timezone: data.timezone,
-      location: data.location,
-      visibility: data.visibility,
-      widgets: data.widgets.filter(w => w.isEnabled !== false),
-      createdAt: now.toDate(),
-      updatedAt: now.toDate(),
-      owner: currentOrganization.id,
-      organizationId: currentOrganization.id,
-      status: data.status || 'draft',
-      photo: data.photo || null,
-      phoneNumber: data.phoneNumber || null,
-      website: data.website || null,
-      coverImage: data.coverImage || null,
-      logoImage: data.logoImage || null,
-      attendees: [],
-      accepted: [],
-      declined: [],
-      undecided: [],
-    };
-
     try {
+      // Ensure location has all required fields with defaults
+      const location = {
+        type: data.location?.type || 'fixed',
+        address: data.location?.address || '',
+        virtualLink: data.location?.virtualLink || '',
+        meetingProvider: data.location?.meetingProvider || 'none', // Add default
+        multiple: data.location?.multiple || []
+      };
+
+      const eventData: Event = {
+        id: '', // Will be set by Firestore
+        source: 'events' as const,
+        title: data.title,
+        description: data.description,
+        start: data.start,
+        end: data.end || null,
+        timezone: data.timezone,
+        location,
+        visibility: data.visibility,
+        widgets: data.widgets.filter(w => w.isEnabled !== false),
+        createdAt: Timestamp.fromDate(data.start),
+        updatedAt: Timestamp.fromDate(data.start),
+        owner: currentOrganization.id,
+        organizationId: currentOrganization.id,
+        status: data.status || 'draft',
+        photo: data.photo || null,
+        phoneNumber: data.phoneNumber || null,
+        website: data.website || null,
+        coverImage: data.coverImage || null,
+        logoImage: data.logoImage || null,
+        attendees: [],
+        accepted: [],
+        declined: [],
+        undecided: [],
+      };
+
       const eventsRef = collection(db, 'events');
       const docRef = doc(eventsRef);
       const docData = {
@@ -257,8 +265,8 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
         // Convert dates to Firestore Timestamps consistently
         start: Timestamp.fromDate(data.start),
         end: data.end ? Timestamp.fromDate(data.end) : null,
-        createdAt: now,
-        updatedAt: now,
+        createdAt: Timestamp.fromDate(data.start),
+        updatedAt: Timestamp.fromDate(data.start),
         // Store widgets as strings to match existing database structure
         widgets: data.widgets.filter(w => w.isEnabled !== false).map(w => w.type)
       };

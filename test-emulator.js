@@ -1,42 +1,49 @@
 import admin from 'firebase-admin';
 
-// Set emulator host before initialization
+// Set emulator host
 process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
 
-// Initialize without credentials since we're using emulator
 const app = admin.initializeApp({
-  projectId: 'timeto-69867'
+  projectId: 'test-project-id'
 });
 
 const db = admin.firestore();
 
-async function checkImportedData() {
+function formatTimestamp(timestamp) {
+  if (!timestamp) return 'N/A';
+  return new Date(timestamp._seconds * 1000).toLocaleString();
+}
+
+async function testDatabaseOperations() {
   try {
-    // Check what collections exist
-    console.log('Checking collections...');
-    const collections = ['organizations', 'users', 'events', 'chats', 'contentReports', 'leads', 'publicEvents', 'recurrences', 'scheduledNotifications', 'userSettings'];
+    console.log('[DEBUG] Testing database operations...');
+    const YOUR_USER_ID = 'K8fRXxDdVp1vQpuxWPXeuDdulv0e';
+
+    // Find organizations you own
+    console.log('\n[DEBUG] Looking for organizations you own...');
+    const ownedOrgsSnapshot = await db.collection('organizations')
+      .where('ownerId', '==', YOUR_USER_ID)
+      .orderBy('createdAt', 'desc')
+      .get();
     
-    for (const collectionName of collections) {
-      console.log(`\nChecking ${collectionName} collection:`);
-      try {
-        const snapshot = await db.collection(collectionName).get();
-        console.log(`Found ${snapshot.size} documents`);
-        
-        if (snapshot.size > 0) {
-          // Print first document as sample
-          const firstDoc = snapshot.docs[0];
-          console.log('Sample document:', {
-            id: firstDoc.id,
-            data: firstDoc.data()
-          });
-        }
-      } catch (collectionError) {
-        console.error(`Error accessing ${collectionName}:`, collectionError.message);
-      }
-    }
+    console.log(`[DEBUG] Found ${ownedOrgsSnapshot.size} organizations owned by you:`);
+    ownedOrgsSnapshot.forEach(doc => {
+      const data = doc.data();
+      console.log('\nOrganization:', {
+        id: doc.id,
+        name: data.name,
+        description: data.description,
+        createdAt: formatTimestamp(data.createdAt),
+        type: data.type
+      });
+    });
+
   } catch (error) {
-    console.error('Error:', error);
+    console.error('[DEBUG] Error during test:', error);
   }
 }
 
-checkImportedData().then(() => process.exit(0));
+testDatabaseOperations().then(() => {
+  console.log('\n[DEBUG] Test completed');
+  process.exit(0);
+});

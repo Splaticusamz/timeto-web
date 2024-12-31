@@ -53,10 +53,14 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
     endDate: event?.end || new Date(new Date().setHours(new Date().getHours() + 1)),
     timezone: event?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
     location: event?.location || {
-      type: 'fixed' as LocationType,
-      address: '',
+      type: currentOrganization?.address ? 'organization' : 'fixed' as LocationType,
+      address: currentOrganization?.address || '',
+      meetingUrl: '',
+      meetingId: '',
+      meetingPassword: '',
+      meetingProvider: 'zoom',
     },
-    visibility: event?.visibility || 'organization',
+    visibility: event?.visibility || currentOrganization?.settings?.defaultEventVisibility || 'organization',
     recurrence: event?.recurrence,
   });
 
@@ -69,7 +73,7 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
   const [logoImageUploading, setLogoImageUploading] = useState(false);
 
   const [eventPhotos, setEventPhotos] = useState({
-    photo: event?.photo || null,
+    photo: event?.photo || currentOrganization?.photoUrl || null,
     coverImage: event?.coverImage || null,
     logoImage: event?.logoImage || null,
   });

@@ -1,9 +1,10 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { collection, doc, getDoc, setDoc, updateDoc, query, where, getDocs, Timestamp, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../config/firebase';
 import { useAuth } from './AuthContext';
 import { Organization, CreateOrganizationData, OrgMemberRole, UserRoles, Member } from '../types/organization';
 import { useNavigate } from 'react-router-dom';
+import debounce from 'lodash/debounce';
 
 interface OrganizationWithEventCount extends Organization {
   eventCount: number;
@@ -46,6 +47,8 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   const [error, setError] = useState<string | null>(null);
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const [skipNextLoad, setSkipNextLoad] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Load user roles
   useEffect(() => {
@@ -118,6 +121,12 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
+    // Skip this load if we just created an organization
+    if (skipNextLoad) {
+      setSkipNextLoad(false);
+      return;
+    }
+
     const loadUserOrganizations = async () => {
       try {
         setLoading(true);
@@ -128,10 +137,8 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
 
         let querySnapshot;
         if (userRoles?.systemRole === 'system_admin') {
-          // System admin sees all organizations
           querySnapshot = await getDocs(collection(db, 'organizations'));
         } else {
-          // Regular users only see their organizations
           const orgsQuery = query(
             collection(db, 'organizations'),
             where(`members.${currentUser.uid}`, '!=', null)
@@ -167,7 +174,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
           setCurrentOrganization(orgsWithCounts[0]);
         }
       } catch (err) {
-        console.error('Failed to load organizations:', err);
+        console.error('[DEBUG] Failed to load organizations:', err);
         setError('Failed to load organizations. Please try again.');
       } finally {
         setLoading(false);
@@ -175,26 +182,24 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     };
 
     loadUserOrganizations();
-  }, [currentUser, userRoles]); // Remove currentOrganization from dependencies
+  }, [currentUser, userRoles, skipNextLoad]);
 
   const createOrganization = async (data: CreateOrganizationData): Promise<OrganizationWithEventCount> => {
+    console.log('[DEBUG] 📝 Creating organization:', {
+      hasImages: Boolean(data.logoImage)
+    });
+
     if (!currentUser || !userRoles) throw new Error('User must be authenticated');
-
-    // Check if user can create organization
-    if (data.parentOrgId && !canCreateSubOrganization(data.parentOrgId)) {
-      throw new Error('You do not have permission to create sub-organizations');
-    }
-
-    if (!data.parentOrgId && !canCreateOrganization()) {
-      throw new Error('You do not have permission to create organizations');
-    }
+    if (isCreating) throw new Error('Organization creation already in progress');
 
     try {
-      setError(null);
+      setIsCreating(true);
       const orgRef = doc(collection(db, 'organizations'));
       const now = Timestamp.now();
+
       const newOrg = {
         ...data,
+        type: data.type || 'business',
         createdAt: now,
         updatedAt: now,
         ownerId: currentUser.uid,
@@ -205,6 +210,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       };
 
       await setDoc(orgRef, newOrg);
+
       const createdOrg = {
         id: orgRef.id,
         ...newOrg,
@@ -213,6 +219,9 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         eventCount: 0,
       } as OrganizationWithEventCount;
 
+      // Set skip flag before updating userRoles
+      setSkipNextLoad(true);
+      
       // Update user roles
       const updatedRoles = {
         ...userRoles,
@@ -221,15 +230,42 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
           [createdOrg.id]: 'owner' as const,
         },
       };
+      
       await updateDoc(doc(db, 'users', currentUser.uid), updatedRoles);
+      
+      // Update local state
       setUserRoles(updatedRoles);
-
-      setUserOrganizations((prev) => [...prev, createdOrg]);
+      setUserOrganizations(prev => {
+        const updated = [...prev, createdOrg];
+        return updated;
+      });
+      
+      // Set as current organization
       setCurrentOrganization(createdOrg);
+      
+      // Store in localStorage
+      localStorage.setItem(`lastOrg_${currentUser.uid}`, createdOrg.id);
+      
+      // Final verification
+      const finalCheck = await getDoc(orgRef);
+      console.log('[DEBUG] Final verification:', {
+        exists: finalCheck.exists(),
+        data: finalCheck.exists() ? JSON.stringify(finalCheck.data(), null, 2) : null,
+        stateUpdated: {
+          userRoles: Boolean(updatedRoles),
+          currentOrg: Boolean(createdOrg),
+          organizationsList: true
+        }
+      });
+
       return createdOrg;
     } catch (err) {
-      console.error('Failed to create organization:', err);
-      throw new Error('Failed to create organization. Please try again.');
+      setSkipNextLoad(false); // Reset skip flag on error
+      console.error('[DEBUG] Creation failed:', err);
+      throw err instanceof Error ? err : new Error('Failed to create organization');
+    } finally {
+      // Add a small delay before allowing another creation
+      setTimeout(() => setIsCreating(false), 1000);
     }
   };
 
@@ -303,45 +339,82 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const switchOrganization = async (id: string) => {
-    if (!currentUser || !userRoles) throw new Error('User must be authenticated');
-
+  const saveOrgToLocalStorage = (org: OrganizationWithEventCount) => {
     try {
-      setError(null);
-      const org = userOrganizations.find((o) => o.id === id);
-      
-      if (!org) {
-        const orgRef = doc(db, 'organizations', id);
-        const orgDoc = await getDoc(orgRef);
-        if (!orgDoc.exists()) throw new Error('Organization not found');
-
-        if (!isSystemAdmin() && !userRoles.organizations[id]) {
-          throw new Error('You do not have access to this organization');
-        }
-
-        const data = orgDoc.data();
-        const newOrg = {
-          id: orgDoc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
-        } as OrganizationWithEventCount;
-        
-        // Store the selected organization ID in localStorage
-        localStorage.setItem(`lastOrg_${currentUser.uid}`, newOrg.id);
-        localStorage.setItem(`lastPath_${currentUser.uid}`, window.location.pathname);
-        setCurrentOrganization(newOrg);
-      } else {
-        // Store the selected organization ID in localStorage
-        localStorage.setItem(`lastOrg_${currentUser.uid}`, org.id);
-        localStorage.setItem(`lastPath_${currentUser.uid}`, window.location.pathname);
-        setCurrentOrganization(org);
-      }
+      // Convert dates to ISO strings before saving
+      const orgToSave = {
+        ...org,
+        createdAt: org.createdAt instanceof Date ? org.createdAt.toISOString() : org.createdAt,
+        updatedAt: org.updatedAt instanceof Date ? org.updatedAt.toISOString() : org.updatedAt
+      };
+      localStorage.setItem(`currentOrg_${currentUser?.uid}`, JSON.stringify(orgToSave));
     } catch (err) {
-      console.error('Failed to switch organization:', err);
-      throw new Error('Failed to switch organization. Please try again.');
+      console.error('Failed to save org to localStorage:', err);
     }
   };
+
+  const switchOrganization = useCallback(async (id: string): Promise<void> => {
+    if (!currentUser) return;
+
+    try {
+      const orgRef = doc(db, 'organizations', id);
+      const orgDoc = await getDoc(orgRef);
+      
+      if (!orgDoc.exists()) {
+        throw new Error('Organization not found');
+      }
+
+      const orgData = orgDoc.data();
+      const org = {
+        id: orgDoc.id,
+        ...orgData,
+        createdAt: orgData.createdAt?.toDate?.() || orgData.createdAt || new Date(),
+        updatedAt: orgData.updatedAt?.toDate?.() || orgData.updatedAt || new Date(),
+        eventCount: 0
+      } as OrganizationWithEventCount;
+
+      setCurrentOrganization(org);
+      localStorage.setItem(`lastOrg_${currentUser.uid}`, id);
+      saveOrgToLocalStorage(org);
+    } catch (err) {
+      console.error('Failed to switch organization:', err);
+      throw err;
+    }
+  }, [currentUser, db]);
+
+  useEffect(() => {
+    if (!currentUser || !userOrganizations.length) return;
+
+    const loadInitialOrg = async () => {
+      try {
+        // Try to get org from localStorage first
+        const savedOrgData = localStorage.getItem(`currentOrg_${currentUser.uid}`);
+        if (savedOrgData) {
+          const parsedOrg = JSON.parse(savedOrgData);
+          // Convert ISO strings back to dates
+          const savedOrg = {
+            ...parsedOrg,
+            createdAt: parsedOrg.createdAt ? new Date(parsedOrg.createdAt) : null,
+            updatedAt: parsedOrg.updatedAt ? new Date(parsedOrg.updatedAt) : null
+          };
+          setCurrentOrganization(savedOrg);
+          return;
+        }
+
+        // Fall back to lastOrg_id if no saved org data
+        const lastOrgId = localStorage.getItem(`lastOrg_${currentUser.uid}`);
+        if (lastOrgId) {
+          await switchOrganization(lastOrgId);
+        } else if (userOrganizations.length > 0) {
+          await switchOrganization(userOrganizations[0].id);
+        }
+      } catch (err) {
+        console.error('Failed to load initial organization:', err);
+      }
+    };
+
+    loadInitialOrg();
+  }, [currentUser, userOrganizations, switchOrganization]);
 
   const getCurrentUserRole = (): OrgMemberRole | null => {
     if (!currentUser || !currentOrganization || !userRoles) return null;
@@ -349,23 +422,33 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const isSystemAdmin = (): boolean => {
-    return userRoles?.systemRole === 'system_admin' || false;
+    const result = userRoles?.systemRole === 'system_admin' || false;
+    console.log('[DEBUG] isSystemAdmin check:', {
+      userRoles: userRoles?.systemRole,
+      result
+    });
+    return result;
   };
 
   const canCreateOrganization = (): boolean => {
-    return isSystemAdmin() || (userRoles?.systemRole === 'user' || false);
+    const result = isSystemAdmin() || (userRoles?.systemRole === 'user' || false);
+    console.log('[DEBUG] canCreateOrganization check:', {
+      isAdmin: isSystemAdmin(),
+      userRole: userRoles?.systemRole,
+      result
+    });
+    return result;
   };
 
   const canCreateSubOrganization = (parentOrgId: string): boolean => {
-    if (isSystemAdmin()) return true;
-    const parentOrg = userOrganizations.find(org => org.id === parentOrgId);
-    if (!parentOrg || !userRoles) return false;
-    
-    const userRole = userRoles.organizations[parentOrgId];
-    return Boolean(
-      parentOrg.settings.allowSubOrganizations &&
-      userRole && ['owner', 'admin'].includes(userRole)
-    );
+    const result = isSystemAdmin() || (userRoles?.organizations[parentOrgId] && ['owner', 'admin'].includes(userRoles.organizations[parentOrgId]));
+    console.log('[DEBUG] canCreateSubOrganization check:', {
+      parentOrgId,
+      isAdmin: isSystemAdmin(),
+      userRole: userRoles?.organizations[parentOrgId],
+      result
+    });
+    return result;
   };
 
   const assignMemberToOrganization = async (

@@ -25,48 +25,25 @@ export interface UserRoles {
   organizations: Record<string, OrgMemberRole>; // orgId -> role mapping
 }
 
-export interface Organization {
-  id: string;
-  name: string;
-  nameLower: string;
-  type: OrganizationType;
-  description?: string;
-  logo?: string;
-  location: Location;
-  operatingHours?: OperatingHours;
-  contactInfo: {
-    email: string;
-    phone?: string;
-    website?: string;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-  ownerId: string;
-  parentOrgId?: string; // For sub-organizations
-  members: Record<string, OrgMemberRole>;
-  settings: {
-    allowPublicEvents: boolean;
-    requireMemberApproval: boolean;
-    defaultEventVisibility: 'public' | 'organization' | 'private';
-    allowSubOrganizations: boolean; // Whether this org can have sub-orgs
-    maxSubOrganizations?: number; // Limit on number of sub-orgs
-  };
-}
-
 export interface CreateOrganizationData {
   name: string;
   description: string;
-  parentOrgId?: string;
-  type?: string;
-  location?: string;
-  contactInfo?: string;
-  settings: {
-    allowPublicEvents: boolean;
-    requireMemberApproval: boolean;
-    defaultEventVisibility: 'public' | 'organization' | 'private';
-    allowSubOrganizations: boolean;
-    maxSubOrganizations: number;
-  };
+  type: string;
+  location: string;
+  contactInfo: Record<string, string>;
+  settings: Record<string, any>;
+  logoImage?: string;
+  previewImage?: string;
+  fullImage?: string;
+}
+
+export interface Organization extends CreateOrganizationData {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+  ownerId: string;
+  nameLower: string;
+  members: Record<string, OrgMemberRole>;
 }
 
 export interface Member {

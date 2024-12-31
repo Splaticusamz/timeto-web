@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, getDocs, doc, getDoc, where, limit, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { getAuth, fetchSignInMethodsForEmail } from 'firebase/auth';
-import { db } from '../../firebase';
+import { db } from '../../config/firebase';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { OrgMemberRole, Organization } from '../../types/organization';
