@@ -21,14 +21,14 @@ export function PhotoUpload({ photo, onPhotoChange, isUploading }: PhotoUploadPr
   return (
     <div className="space-y-4">
       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-        Event Photo
+        Organization Photo
       </label>
       
       {photo ? (
         <div className="relative">
           <img 
             src={photo} 
-            alt="Event" 
+            alt="Organization"
             className="w-full h-48 object-cover rounded-lg"
           />
           <button

@@ -69,7 +69,7 @@ export function BasicInfoForm({ data, onChange }: BasicInfoFormProps) {
   };
 
   const locationTypes = [
-    ...(currentOrganization?.address ? [{ value: 'organization', label: 'Organization Location' }] : []),
+    ...(currentOrganization?.location?.address ? [{ value: 'organization', label: 'Organization Location' }] : []),
     { value: 'fixed', label: 'Fixed Location' },
     { value: 'virtual', label: 'Virtual Meeting' },
     { value: 'hybrid', label: 'Hybrid' },
@@ -78,11 +78,8 @@ export function BasicInfoForm({ data, onChange }: BasicInfoFormProps) {
   const handleLocationTypeChange = (type: LocationType) => {
     const newLocation: EventLocation = {
       type,
-      address: type === 'organization' ? '' : data.location.address || '',
-      meetingUrl: ['virtual', 'hybrid'].includes(type) ? data.location.meetingUrl || '' : '',
-      meetingId: ['virtual', 'hybrid'].includes(type) ? data.location.meetingId || '' : '',
-      meetingPassword: ['virtual', 'hybrid'].includes(type) ? data.location.meetingPassword || '' : '',
-      meetingProvider: ['virtual', 'hybrid'].includes(type) ? data.location.meetingProvider || 'zoom' : undefined,
+      address: type === 'organization' ? currentOrganization?.location?.address || '' : data.location.address || '',
+      meetingUrl: '',
     };
     onChange({ ...data, location: newLocation });
   };
@@ -164,6 +161,20 @@ export function BasicInfoForm({ data, onChange }: BasicInfoFormProps) {
         </select>
       </div>
 
+      {(data.location.type === 'organization') && (
+        <div>
+          <label className={formClasses.label}>
+            Organization Address
+          </label>
+          <input
+            type="text"
+            value={currentOrganization?.location?.address || ''}
+            disabled
+            className={`${formClasses.input} bg-gray-100 dark:bg-gray-600 cursor-not-allowed`}
+          />
+        </div>
+      )}
+
       {data.location.type === 'fixed' && (
         <div>
           <label className={formClasses.label}>
@@ -181,7 +192,7 @@ export function BasicInfoForm({ data, onChange }: BasicInfoFormProps) {
         </div>
       )}
 
-      {(data.location.type === 'virtual' || data.location.type === 'hybrid') && (
+      {(data.location.type === 'virtual' || data.location.type === 'hybrid') && data.location.type !== 'organization' && (
         <div className="space-y-4">
           <div>
             <label className={formClasses.label}>
@@ -189,67 +200,19 @@ export function BasicInfoForm({ data, onChange }: BasicInfoFormProps) {
             </label>
             <input
               type="url"
-              value={data.location.meetingUrl}
+              value={data.location.meetingUrl || ''}
               onChange={(e) => onChange({
                 ...data,
                 location: { ...data.location, meetingUrl: e.target.value }
               })}
               className={formClasses.input}
+              required={data.location.type === 'virtual' || data.location.type === 'hybrid'}
             />
-          </div>
-
-          <div>
-            <label className={formClasses.label}>
-              Meeting ID (Optional)
-            </label>
-            <input
-              type="text"
-              value={data.location.meetingId || ''}
-              onChange={(e) => onChange({
-                ...data,
-                location: { ...data.location, meetingId: e.target.value }
-              })}
-              className={formClasses.input}
-            />
-          </div>
-
-          <div>
-            <label className={formClasses.label}>
-              Meeting Password (Optional)
-            </label>
-            <input
-              type="text"
-              value={data.location.meetingPassword || ''}
-              onChange={(e) => onChange({
-                ...data,
-                location: { ...data.location, meetingPassword: e.target.value }
-              })}
-              className={formClasses.input}
-            />
-          </div>
-
-          <div>
-            <label className={formClasses.label}>
-              Meeting Provider
-            </label>
-            <select
-              value={data.location.meetingProvider || 'zoom'}
-              onChange={(e) => onChange({
-                ...data,
-                location: { ...data.location, meetingProvider: e.target.value }
-              })}
-              className={formClasses.select}
-            >
-              <option value="zoom">Zoom</option>
-              <option value="teams">Microsoft Teams</option>
-              <option value="meet">Google Meet</option>
-              <option value="other">Other</option>
-            </select>
           </div>
         </div>
       )}
 
-      {data.location.type === 'hybrid' && (
+      {data.location.type === 'hybrid' && data.location.type !== 'organization' && (
         <div>
           <label className={formClasses.label}>
             Physical Location Address

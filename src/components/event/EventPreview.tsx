@@ -546,10 +546,10 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
         <div className="flex gap-4">
           <div className="w-64 flex-shrink-0">
             <div className="space-y-2">
-              {!isEditMode && <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Event Photo</h4>}
+              {!isEditMode && <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Organization Photo</h4>}
               {isEditMode ? (
                 <ImageUpload
-                  label="Event Photo"
+                  label="Organization Photo"
                   currentImage={event.photo}
                   onImageChange={handlePhotoUpload}
                   isUploading={photoUploading}
@@ -561,7 +561,7 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
                   {event.photo ? (
                     <img
                       src={event.photo}
-                      alt="Event Photo"
+                      alt="Organization Photo"
                       className="w-full h-full object-cover"
                       crossOrigin="anonymous"
                     />

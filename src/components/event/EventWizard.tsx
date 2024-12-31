@@ -53,12 +53,9 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
     endDate: event?.end || new Date(new Date().setHours(new Date().getHours() + 1)),
     timezone: event?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
     location: event?.location || {
-      type: currentOrganization?.address ? 'organization' : 'fixed' as LocationType,
-      address: currentOrganization?.address || '',
+      type: currentOrganization?.location?.address ? 'organization' : 'fixed',
+      address: currentOrganization?.location?.address || '',
       meetingUrl: '',
-      meetingId: '',
-      meetingPassword: '',
-      meetingProvider: 'zoom',
     },
     visibility: event?.visibility || currentOrganization?.settings?.defaultEventVisibility || 'organization',
     recurrence: event?.recurrence,
@@ -255,11 +252,11 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
       setError('End date must be after start date');
       return false;
     }
-    if (basicInfo.location.type !== 'virtual' && !basicInfo.location.address) {
+    if (basicInfo.location.type === 'fixed' && !basicInfo.location.address) {
       setError('Please enter a location address');
       return false;
     }
-    if (basicInfo.location.type !== 'fixed' && !basicInfo.location.meetingUrl) {
+    if ((basicInfo.location.type === 'virtual' || basicInfo.location.type === 'hybrid') && !basicInfo.location.meetingUrl) {
       setError('Please enter a meeting URL');
       return false;
     }
@@ -695,8 +692,8 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
               <div className="flex gap-4">
                 <div className="w-64 flex-shrink-0">
                   <ImageUpload
-                    label="Event Photo"
-                    currentImage={eventPhotos.photo || currentOrganization?.logoImage}
+                    label="Organization Photo"
+                    currentImage={eventPhotos.photo || currentOrganization?.photoUrl}
                     onImageChange={handlePhotoUpload}
                     isUploading={photoUploading}
                     aspectRatio="square"
