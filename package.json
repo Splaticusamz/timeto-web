@@ -21,6 +21,7 @@
     "@headlessui/react": "^1.7.19",
     "@heroicons/react": "^2.1.1",
     "@types/lodash": "^4.17.13",
+    "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
     "firebase": "^10.14.1",

@@ -1,26 +1,21 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 
-// Use a consistent configuration for emulator
 const firebaseConfig = {
   apiKey: 'test-api-key',
-  authDomain: 'test-auth-domain',
-  projectId: 'test-project-id',
-  messagingSenderId: 'test-messaging-sender-id',
-  appId: 'test-app-id'
+  projectId: 'demo-project'
 };
 
-// Initialize Firebase first
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getFirestore(app);
+const auth = getAuth(app);
+const functions = getFunctions(app);
 
-// Connect emulators in development
-if (import.meta.env.DEV) {
-  connectFirestoreEmulator(db, 'localhost', 8080);
-  connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-}
+// Connect to emulators
+connectFirestoreEmulator(db, 'localhost', 8080);
+connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+connectFunctionsEmulator(functions, 'localhost', 5001);
 
-export { auth, db };
-export default app; 
+export { db, auth, functions }; 

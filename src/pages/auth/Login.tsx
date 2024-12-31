@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 export function Login() {
@@ -35,6 +35,15 @@ export function Login() {
         <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
           Sign in to your account
         </h2>
+        <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+          Or{' '}
+          <Link
+            to="/register"
+            className="font-medium text-primary-600 hover:text-primary-500"
+          >
+            create a new account
+          </Link>
+        </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -91,6 +100,18 @@ export function Login() {
             </div>
           </form>
         </div>
+      </div>
+
+      <div className="mt-4 text-center">
+        <span className="text-sm text-gray-600 dark:text-gray-400">
+          Don't have an account?{' '}
+          <Link
+            to="/register"
+            className="font-medium text-primary-600 hover:text-primary-500"
+          >
+            Sign up
+          </Link>
+        </span>
       </div>
     </div>
   );
