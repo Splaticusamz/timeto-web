@@ -172,17 +172,16 @@ function CreateOrganizationModal({ isOpen, onClose, onSuccess }: CreateOrganizat
       }
 
       // Format the data to match the expected structure
-      const organizationData = {
+      const organizationData: CreateOrganizationData = {
         name: formData.name,
         description: formData.description,
         type: formData.type,
-        location: formData.location,
+        location: JSON.stringify(formData.location), // Convert location object to string
         contactInfo: formData.contactInfo,
         settings: formData.settings,
         logoImage: imageUrl,
         previewImage: imageUrl,
-        fullImage: imageUrl,
-        photoUrl: imageUrl
+        fullImage: imageUrl
       };
 
       // Create organization and get the result
@@ -599,17 +598,15 @@ export function Organizations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [organizations, setOrganizations] = useState<any[]>([]);
-  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hideZeroPrivate, setHideZeroPrivate] = useState(false);
   const [hideZeroPublic, setHideZeroPublic] = useState(false);
-  const observerTarget = useRef<HTMLDivElement>(null);
-  const ITEMS_PER_PAGE = 10;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'createdAt' | 'updatedAt'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [toast, setToast] = useState<{ message: string; orgName: string } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const handleToastClick = (orgName: string) => {
     setSearchTerm(orgName);
@@ -634,17 +631,13 @@ export function Organizations() {
     if (!currentUser || !userRoles) return;
 
     try {
-      if (!searchQuery) {
-        setIsLoading(true);
-      } else {
-        setIsLoadingMore(true);
-      }
+      setIsLoading(true);
 
-      let organizationsQuery;
+      let baseQuery;
       
       // If user is system_admin, show all organizations
       if (userRoles.systemRole === 'system_admin') {
-        organizationsQuery = query(
+        baseQuery = query(
           collection(db, 'organizations'),
           orderBy(sortBy, sortOrder)
         );
@@ -653,80 +646,110 @@ export function Organizations() {
         const userOrgIds = Object.keys(userRoles.organizations);
         if (userOrgIds.length === 0) {
           setOrganizations([]);
-          setHasMore(false);
+          setTotalPages(1);
           return;
         }
 
-        organizationsQuery = query(
+        baseQuery = query(
           collection(db, 'organizations'),
           where('__name__', 'in', userOrgIds),
           orderBy(sortBy, sortOrder)
         );
       }
 
-      if (lastVisible && searchQuery) {
-        organizationsQuery = query(
-          organizationsQuery,
-          startAfter(lastVisible),
-          limit(ITEMS_PER_PAGE)
-        );
-      } else {
-        organizationsQuery = query(
-          organizationsQuery,
-          limit(ITEMS_PER_PAGE)
-        );
-      }
-
-      const snapshot = await getDocs(organizationsQuery);
-      const newOrgs = snapshot.docs.map(doc => ({
+      // Get all organizations
+      const snapshot = await getDocs(baseQuery);
+      let allOrgs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Array<{ id: string; name: string; [key: string]: any }>;
 
-      setOrganizations(prev => searchQuery ? [...prev, ...newOrgs] : newOrgs);
-      setLastVisible(snapshot.docs[snapshot.docs.length - 1] || null);
-      setHasMore(snapshot.docs.length === ITEMS_PER_PAGE);
+      // Store all organizations
+      setOrganizations(allOrgs);
+
+      // Load event counts for all organizations
+      const eventCounts: OrganizationEventCounts = {};
+      await Promise.all(
+        allOrgs.map(async (org) => {
+          try {
+            const [privateEvents, publicEvents] = await Promise.all([
+              getDocs(query(
+                collection(db, 'events'),
+                where('owner', '==', org.id)
+              )),
+              getDocs(query(
+                collection(db, 'publicEvents'),
+                where('owner', '==', org.id)
+              ))
+            ]);
+
+            eventCounts[org.id] = {
+              private: privateEvents.size,
+              public: publicEvents.size
+            };
+          } catch (err) {
+            console.error(`Failed to load event counts for organization ${org.id}:`, err);
+            eventCounts[org.id] = { private: 0, public: 0 };
+          }
+        })
+      );
+
+      setOrganizationEventCounts(eventCounts);
     } catch (err) {
       console.error('Failed to load organizations:', err);
     } finally {
       setIsLoading(false);
-      setIsLoadingMore(false);
     }
   }, [currentUser, userRoles, sortBy, sortOrder]);
 
-  const debouncedSearch = useCallback(
-    debounce((query: string) => {
-      setLastVisible(null);
-      setHasMore(true);
-      // Capitalize first letter to match the format in the database
-      const formattedQuery = query ? query.charAt(0).toUpperCase() + query.slice(1) : '';
-      loadOrganizations(formattedQuery);
-    }, 300),
-    [loadOrganizations]
-  );
+  // Get filtered organizations
+  const getFilteredOrganizations = useCallback(() => {
+    let filtered = [...organizations];
 
-  useEffect(() => {
-    debouncedSearch(searchTerm);
-    return () => debouncedSearch.cancel();
-  }, [searchTerm, debouncedSearch]);
-
-  // Infinite scroll observer
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting && hasMore && !isLoading && !isLoadingMore) {
-          loadOrganizations(searchTerm);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
+    // Apply search filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(org => 
+        org.name.toLowerCase().includes(searchLower)
+      );
     }
 
-    return () => observer.disconnect();
-  }, [hasMore, isLoading, isLoadingMore, loadOrganizations, searchTerm]);
+    // Apply event count filters
+    if (hideZeroPrivate || hideZeroPublic) {
+      filtered = filtered.filter(org => {
+        const counts = organizationEventCounts[org.id] || { private: 0, public: 0 };
+        if (hideZeroPrivate && counts.private === 0) return false;
+        if (hideZeroPublic && counts.public === 0) return false;
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [organizations, searchTerm, hideZeroPrivate, hideZeroPublic, organizationEventCounts]);
+
+  // Update total pages when filters change
+  useEffect(() => {
+    const filtered = getFilteredOrganizations();
+    const total = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+    setTotalPages(total);
+  }, [getFilteredOrganizations]);
+
+  // Get current page organizations
+  const getCurrentPageOrganizations = useCallback(() => {
+    const filtered = getFilteredOrganizations();
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filtered.slice(startIndex, endIndex);
+  }, [getFilteredOrganizations, currentPage]);
+
+  // Load organizations on mount and when sort changes
+  useEffect(() => {
+    loadOrganizations();
+  }, [sortBy, sortOrder, loadOrganizations]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
 
   const handleOrganizationClick = async (orgId: string) => {
     try {
@@ -734,6 +757,87 @@ export function Organizations() {
     } catch (err) {
       console.error('Failed to switch organization:', err);
     }
+  };
+
+  const Pagination = () => {
+    if (totalPages <= 1) return null;
+
+    const MAX_VISIBLE_PAGES = 5;
+    let pages: (number | string)[] = [];
+
+    if (totalPages <= MAX_VISIBLE_PAGES) {
+      // Show all pages if total pages is less than or equal to max visible pages
+      pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+    } else {
+      // Always show first and last page
+      pages = [1];
+
+      // Calculate middle pages
+      let startPage = Math.max(2, currentPage - 1);
+      let endPage = Math.min(totalPages - 1, currentPage + 1);
+
+      // Adjust if we're near the start or end
+      if (currentPage <= 3) {
+        endPage = 4;
+      } else if (currentPage >= totalPages - 2) {
+        startPage = totalPages - 3;
+      }
+
+      // Add ellipsis if needed
+      if (startPage > 2) {
+        pages.push('...');
+      }
+
+      // Add middle pages
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i);
+      }
+
+      // Add ellipsis if needed
+      if (endPage < totalPages - 1) {
+        pages.push('...');
+      }
+
+      // Add last page
+      pages.push(totalPages);
+    }
+
+    return (
+      <div className="flex justify-center items-center space-x-2 mt-6">
+        <button
+          onClick={() => handlePageChange(1)}
+          disabled={currentPage === 1}
+          className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          First
+        </button>
+        {pages.map((page, index) => (
+          <React.Fragment key={index}>
+            {typeof page === 'string' ? (
+              <span className="px-3 py-2 text-gray-500 dark:text-gray-400">{page}</span>
+            ) : (
+              <button
+                onClick={() => handlePageChange(page)}
+                className={`px-3 py-2 rounded-md text-sm font-medium ${
+                  currentPage === page
+                    ? 'bg-primary-600 text-white'
+                    : 'text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
+              >
+                {page}
+              </button>
+            )}
+          </React.Fragment>
+        ))}
+        <button
+          onClick={() => handlePageChange(totalPages)}
+          disabled={currentPage === totalPages}
+          className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Last
+        </button>
+      </div>
+    );
   };
 
   const EventCountPill = ({ type, count }: { type: 'private' | 'public', count: number }) => {
@@ -761,21 +865,6 @@ export function Organizations() {
       </span>
     );
   };
-
-  // Filter organizations based on event counts
-  const filteredOrganizations = organizations.filter(org => {
-    const counts = organizationEventCounts[org.id] || { private: 0, public: 0 };
-    if (hideZeroPrivate && counts.private === 0) return false;
-    if (hideZeroPublic && counts.public === 0) return false;
-    return true;
-  });
-
-  // Reset pagination when sort changes
-  useEffect(() => {
-    setLastVisible(null);
-    setHasMore(true);
-    loadOrganizations();
-  }, [sortBy, sortOrder, loadOrganizations]);
 
   return (
     <>
@@ -805,7 +894,10 @@ export function Organizations() {
                     type="text"
                     placeholder="Search organizations..."
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1); // Reset to first page when searching
+                    }}
                     className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                 </div>
@@ -895,7 +987,7 @@ export function Organizations() {
                   New Organization
                 </button>
               )}
-              {filteredOrganizations.map(org => (
+              {getCurrentPageOrganizations().map(org => (
                 <div
                   key={`org-list-${org.id}`}
                   onClick={() => handleOrganizationClick(org.id)}
@@ -927,17 +1019,11 @@ export function Organizations() {
                   </div>
                 </div>
               ))}
+              <Pagination />
             </>
           )}
 
-          {/* Infinite scroll observer */}
-          <div 
-            ref={observerTarget} 
-            className="h-4"
-            aria-hidden="true"
-          />
-
-          {(isLoading || isLoadingMore) && (
+          {isLoading && (
             <div className="flex justify-center py-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
             </div>
