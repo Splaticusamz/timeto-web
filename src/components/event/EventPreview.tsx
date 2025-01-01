@@ -320,7 +320,6 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
   const { updateEvent } = useEvent();
   const [event, setEvent] = useState<Event>(initialEvent);
   const [editingField, setEditingField] = useState<string | null>(null);
-  const [photoUploading, setPhotoUploading] = useState(false);
   const [coverImageUploading, setCoverImageUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isAddingNotification, setIsAddingNotification] = useState(false);
@@ -355,25 +354,6 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
     } catch (error) {
       console.error('Failed to update field:', error);
       throw error;
-    }
-  };
-
-  const handlePhotoUpload = async (file: File | null) => {
-    try {
-      setPhotoUploading(true);
-      if (file) {
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          await updateEvent(event.id, { photo: reader.result as string });
-        };
-        reader.readAsDataURL(file);
-      } else {
-        await updateEvent(event.id, { photo: null });
-      }
-    } catch (error) {
-      console.error('Failed to upload photo:', error);
-    } finally {
-      setPhotoUploading(false);
     }
   };
 
@@ -543,38 +523,8 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Images section at the top */}
       {!props.hideImages && (
-        <div className="flex gap-4">
-          <div className="w-64 flex-shrink-0">
-            <div className="space-y-2">
-              {!isEditMode && <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Organization Photo</h4>}
-              {isEditMode ? (
-                <ImageUpload
-                  label="Organization Photo"
-                  currentImage={event.photo}
-                  onImageChange={handlePhotoUpload}
-                  isUploading={photoUploading}
-                  aspectRatio="square"
-                  className="h-64"
-                />
-              ) : (
-                <div className="relative w-full h-64 rounded-lg overflow-hidden bg-black/10 dark:bg-white/10">
-                  {event.photo ? (
-                    <img
-                      src={event.photo}
-                      alt="Organization Photo"
-                      className="w-full h-full object-cover"
-                      crossOrigin="anonymous"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
-                      <span className="text-sm">No photo uploaded</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="flex-1">
+        <div>
+          <div className="w-full">
             <div className="space-y-2">
               {!isEditMode && <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Cover Image</h4>}
               {isEditMode ? (
@@ -607,7 +557,7 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Event Details */}
         <div className="space-y-6">
           <div>
@@ -1066,7 +1016,7 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
           {/* Widgets Section */}
           <div>
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Widgets</h3>
-            <div className="mt-4 grid grid-cols-2 gap-4">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[
                 'photos',
                 'location',
@@ -1126,7 +1076,7 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Attendees</h3>
               <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
-                <div className="space-y-4">
+                <div className="space-y-6 sm:space-y-4">
                   {/* Accepted attendees */}
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex justify-between items-center">

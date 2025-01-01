@@ -65,12 +65,10 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
     widgets: event?.widgets || [],
   });
 
-  const [photoUploading, setPhotoUploading] = useState(false);
   const [coverImageUploading, setCoverImageUploading] = useState(false);
   const [logoImageUploading, setLogoImageUploading] = useState(false);
 
   const [eventPhotos, setEventPhotos] = useState({
-    photo: event?.photo || currentOrganization?.photoUrl || null,
     coverImage: event?.coverImage || null,
     logoImage: event?.logoImage || null,
   });
@@ -156,41 +154,6 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
       };
       img.onerror = () => reject(new Error('Failed to load image'));
     });
-  };
-
-  const handlePhotoUpload = async (file: File | null) => {
-    try {
-      setPhotoUploading(true);
-      setError(null);
-    
-      if (file === null) {
-        setEventPhotos(prev => ({ ...prev, photo: null }));
-        if (event?.id) {
-          await updateEvent(event.id, {
-            ...event,
-            photo: null,
-          });
-        }
-        return;
-      }
-
-      // Compress the image
-      const compressedBlob = await compressImage(file);
-      const previewUrl = URL.createObjectURL(compressedBlob);
-      setEventPhotos(prev => ({ ...prev, photo: previewUrl }));
-
-      if (event?.id) {
-        await updateEvent(event.id, {
-          ...event,
-          photo: previewUrl,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to upload photo:', err);
-      setError('Failed to upload photo. Please try again.');
-    } finally {
-      setPhotoUploading(false);
-    }
   };
 
   const handleCoverImageUpload = async (file: File) => {
@@ -397,21 +360,6 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
       let photoDataUrl = null;
       let coverImageDataUrl = null;
 
-      if (eventPhotos.photo?.startsWith('blob:')) {
-        try {
-          const response = await fetch(eventPhotos.photo);
-          const blob = await response.blob();
-          const compressedBlob = await compressImage(new File([blob], 'photo.jpg', { type: 'image/jpeg' }));
-          photoDataUrl = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(compressedBlob);
-          });
-        } catch (error) {
-          console.error('Failed to convert photo blob to data URL:', error);
-        }
-      }
-
       if (eventPhotos.coverImage?.startsWith('blob:')) {
         try {
           const response = await fetch(eventPhotos.coverImage);
@@ -508,7 +456,6 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
           }),
         organizationId: currentOrganization?.id || '',
         status: publish ? 'published' : 'draft',
-        photo: photoDataUrl,
         coverImage: coverImageDataUrl,
         logoImage: eventPhotos.logoImage,
       };
@@ -615,8 +562,8 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
   return (
     <div className="max-w-6xl mx-auto py-8 px-4">
       <div className="mb-8">
-        <nav className="flex justify-center">
-          <ol className="flex items-center">
+        <nav className="flex justify-center overflow-x-auto">
+          <ol className="flex items-center min-w-full sm:min-w-0">
             <li className="flex items-center">
               <div className="flex items-center">
                 <span className={`w-8 h-8 flex items-center justify-center rounded-full border-2 ${
@@ -632,7 +579,7 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
                   Basic Info
                 </span>
               </div>
-              <div className="mx-4 w-24 border-t border-gray-300"></div>
+              <div className="mx-2 sm:mx-4 w-12 sm:w-24 border-t border-gray-300"></div>
             </li>
 
             <li className="flex items-center">
@@ -650,7 +597,7 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
                   Widgets
                 </span>
               </div>
-              <div className="mx-4 w-24 border-t border-gray-300"></div>
+              <div className="mx-2 sm:mx-4 w-12 sm:w-24 border-t border-gray-300"></div>
             </li>
 
             <li className="flex items-center">
@@ -689,42 +636,30 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
             />
             
             <div className="mt-8">
-              <div className="flex gap-4">
-                <div className="w-64 flex-shrink-0">
-                  <ImageUpload
-                    label="Organization Photo"
-                    currentImage={eventPhotos.photo || currentOrganization?.photoUrl}
-                    onImageChange={handlePhotoUpload}
-                    isUploading={photoUploading}
-                    aspectRatio="square"
-                    className="h-64"
-                  />
-                </div>
-                <div className="flex-1">
-                  <ImageUpload
-                    label="Event Cover Image"
-                    currentImage={eventPhotos.coverImage}
-                    onImageChange={handleCoverImageUpload}
-                    isUploading={coverImageUploading}
-                    aspectRatio="cover"
-                    className="h-64"
-                  />
-                </div>
+              <div className="w-full">
+                <ImageUpload
+                  label="Event Cover Image"
+                  currentImage={eventPhotos.coverImage}
+                  onImageChange={handleCoverImageUpload}
+                  isUploading={coverImageUploading}
+                  aspectRatio="cover"
+                  className="h-64"
+                />
               </div>
             </div>
 
-            <div className="mt-6 flex justify-between">
+            <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
               <button
                 type="button"
                 onClick={handleBack}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 Back
               </button>
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
               >
                 Next
               </button>
@@ -736,7 +671,7 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
           <div className="space-y-6">
             <h2 className="text-lg font-medium !text-gray-900 dark:!text-white">Configure Widgets</h2>
             <div className="grid grid-cols-1 gap-8">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
                 <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">Available Widgets</h3>
                 <WidgetSelector
                   selectedWidgets={widgetConfig.widgets}
@@ -745,7 +680,7 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
               </div>
 
               {widgetConfig.widgets.some(w => ['messageBoard', 'website', 'phoneNumber', 'call'].includes(w.type)) && (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
                   <h3 className="text-md font-medium text-gray-900 dark:text-gray-100 mb-4">Widget Configuration</h3>
                   <div className="space-y-6">
                     {widgetConfig.widgets
@@ -922,18 +857,18 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
               )}
               </div>
 
-            <div className="mt-6 flex justify-between">
+            <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
               <button
                 type="button"
                 onClick={handleBack}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 Back
               </button>
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
               >
                 Next
               </button>
@@ -966,7 +901,6 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
                     owner: event?.owner || '',
                     status: event?.status || 'draft',
                     source: event?.source || 'events',
-                    photo: eventPhotos.photo,
                     coverImage: eventPhotos.coverImage,
                     logoImage: eventPhotos.logoImage,
                     isPublic: basicInfo.visibility === 'public',
@@ -983,18 +917,18 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
               </div>
             </div>
 
-            <div className="mt-6 flex justify-between">
+            <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
               <button
                 type="button"
                 onClick={handleBack}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 Back
               </button>
               <button
                 type="button"
                 onClick={() => handleSave(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
                 disabled={saving}
               >
                 {saving ? 'Publishing...' : 'Publish'}
