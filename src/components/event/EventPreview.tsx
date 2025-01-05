@@ -28,6 +28,8 @@ import { useEvent } from '../../contexts/EventContext';
 import { EventMembers } from './EventMembers';
 import { useMember } from '../../contexts/MemberContext';
 import { ImageUpload } from './ImageUpload';
+import { doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 
 interface EventPreviewProps {
   event: Event;
@@ -45,11 +47,29 @@ function AttendeeAvatar({ member: { id } }: { member: { id: string } }) {
     const loadMember = async () => {
       try {
         const foundMember = registeredMembers.find(m => m.id === id);
+        console.log('Found member in registeredMembers:', foundMember);
+        
         if (foundMember) {
-          setMember(foundMember);
+          setMember({
+            ...foundMember,
+            photoUrl: foundMember.profileImageUrl || foundMember.photoUrl || null
+          });
         } else {
-          // Fallback to showing first character of ID if member not found
-          setMember({ firstName: id.charAt(0).toUpperCase(), lastName: '' });
+          // Try to fetch member directly from Firestore if not in registeredMembers
+          const memberDoc = await getDoc(doc(db, 'users', id));
+          console.log('Fetched user data from Firestore:', memberDoc.data());
+          
+          if (memberDoc.exists()) {
+            const userData = memberDoc.data();
+            setMember({
+              id,
+              firstName: userData.firstName || '',
+              lastName: userData.lastName || '',
+              photoUrl: userData.profileImageUrl || null
+            });
+          } else {
+            setMember({ firstName: id.charAt(0).toUpperCase(), lastName: '' });
+          }
         }
       } catch (error) {
         console.error('Failed to load member:', error);
@@ -58,6 +78,11 @@ function AttendeeAvatar({ member: { id } }: { member: { id: string } }) {
     };
     loadMember();
   }, [id, registeredMembers]);
+
+  // Add debug log for member state changes
+  useEffect(() => {
+    console.log('Member state updated:', member);
+  }, [member]);
 
   if (!member) {
     return (
@@ -72,26 +97,36 @@ function AttendeeAvatar({ member: { id } }: { member: { id: string } }) {
   return (
     <div className="relative group cursor-pointer">
       <div className="h-8 w-8 transition-transform group-hover:scale-110">
-        {member.photoUrl ? (
+        {member.photoUrl && member.photoUrl !== 'null' ? (
           <img 
             src={member.photoUrl} 
             alt={`${member.firstName} ${member.lastName}`}
             className="h-8 w-8 rounded-full object-cover ring-2 ring-white dark:ring-gray-800"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = ''; // Clear the src to show fallback
+              member.photoUrl = null; // Update state to show initials
+              setMember({...member, photoUrl: null});
+            }}
           />
         ) : (
           <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center ring-2 ring-white dark:ring-gray-800">
             <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {member.firstName ? member.firstName[0].toUpperCase() : '?'}
-              {member.lastName ? member.lastName[0].toUpperCase() : ''}
+              {member.firstName && member.lastName 
+                ? `${member.firstName[0]}${member.lastName[0]}`.toUpperCase()
+                : member.firstName 
+                  ? member.firstName[0].toUpperCase()
+                  : '?'
+              }
             </span>
           </div>
         )}
 
         {/* Tooltip */}
         <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap invisible group-hover:visible transition-all">
-          {member.firstName || member.lastName ? 
-            `${member.firstName} ${member.lastName}`.trim() : 
-            'Unknown Member'}
+          {member.firstName && member.lastName
+            ? `${member.firstName} ${member.lastName}`
+            : member.firstName || 'Unknown Member'}
           <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
             <div className="border-4 border-transparent border-t-gray-900"></div>
           </div>
@@ -326,11 +361,13 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
   const [editingIndex, setEditingIndex] = useState(-1);
   const [newNotification, setNewNotification] = useState({ value: 5, unit: 'minutes' });
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
+  const [loadingWidgets, setLoadingWidgets] = useState<string[]>([]);
 
   // Update the useEffect to properly sync with initialEvent changes
   useEffect(() => {
-    console.log('Initial event updated:', initialEvent);
-    setEvent(initialEvent);
+    if (initialEvent) {
+      setEvent(initialEvent);
+    }
   }, [initialEvent]);
 
   const handleFieldEdit = (field: string) => {
@@ -512,12 +549,67 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
     }
   };
 
-  // For debugging
-  console.log('Event data:', {
-    start: event.start,
-    type: typeof event.start,
-    isTimestamp: typeof event.start === 'object' && 'seconds' in event.start
-  });
+  const handleWidgetToggle = async (widgetType: string) => {
+    if (!event.id) {
+      console.error('No event ID found');
+      return;
+    }
+
+    try {
+      setLoadingWidgets(prev => [...prev, widgetType]);
+      console.log('Current event widgets:', event.widgets);
+      
+      // Convert existing widgets to the correct format
+      const existingWidgets = Array.isArray(event.widgets) 
+        ? event.widgets.map(w => typeof w === 'object' ? w.type : w)
+        : [];
+      
+      // Check if widget is currently enabled
+      const isEnabled = existingWidgets.includes(widgetType);
+      
+      // Create new widgets array
+      let newWidgets;
+      if (isEnabled) {
+        // Remove widget if enabled
+        newWidgets = event.widgets.filter(w => 
+          (typeof w === 'object' ? w.type : w) !== widgetType
+        );
+      } else {
+        // Add widget if disabled
+        newWidgets = [
+          ...event.widgets,
+          {
+            id: widgetType,
+            type: widgetType,
+            isEnabled: true
+          }
+        ];
+      }
+
+      // Update database first
+      const eventRef = doc(db, 'events', event.id);
+      await updateDoc(eventRef, { widgets: newWidgets });
+
+      // Update through the context
+      const updatedEvent = await updateEvent(event.id, { 
+        widgets: newWidgets
+      });
+      
+      if (updatedEvent) {
+        setEvent(updatedEvent);
+      }
+
+    } catch (error) {
+      console.error('[DEBUG] Failed to toggle widget:', error);
+    } finally {
+      setLoadingWidgets(prev => prev.filter(w => w !== widgetType));
+    }
+  };
+
+  // Add a debug effect to monitor widget state changes
+  useEffect(() => {
+    console.log('Event widgets state changed:', event.widgets);
+  }, [event.widgets]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -1027,9 +1119,12 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
                 'website',
                 'call'
               ].map((widgetType) => {
-                const widget = Array.isArray(event.widgets) && event.widgets.find(w => w.type === widgetType);
-                const isEnabled = widget?.isEnabled ?? false;
+                const isEnabled = Array.isArray(event.widgets) && event.widgets.some(w => 
+                  (typeof w === 'object' ? w.type : w) === widgetType && 
+                  (typeof w === 'object' ? w.isEnabled : true)
+                );
                 const Icon = getWidgetIcon(widgetType);
+                const isLoading = loadingWidgets.includes(widgetType);
 
                 return (
                   <div
@@ -1038,17 +1133,29 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
                       isEnabled
                         ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
                         : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'
+                    } ${isEditMode ? 'cursor-pointer hover:bg-opacity-80' : ''} ${
+                      isLoading ? 'opacity-50' : ''
                     }`}
+                    onClick={() => isEditMode && !isLoading && handleWidgetToggle(widgetType)}
                   >
                     <div className="flex items-center space-x-3">
                       {Icon && (
-                        <Icon 
-                          className={`h-5 w-5 ${
-                            isEnabled
-                              ? 'text-green-600 dark:text-green-400'
-                              : 'text-gray-400 dark:text-gray-500'
-                          }`}
-                        />
+                        isLoading ? (
+                          <div className="animate-spin h-5 w-5">
+                            <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          </div>
+                        ) : (
+                          <Icon 
+                            className={`h-5 w-5 ${
+                              isEnabled
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-gray-400 dark:text-gray-500'
+                            }`}
+                          />
+                        )
                       )}
                       <h4 className={`text-sm font-medium ${
                         isEnabled
@@ -1150,13 +1257,6 @@ export function EventPreview({ event: initialEvent, isEditMode = false, ...props
           )}
         </div>
       </div>
-
-      {/* Members Section */}
-      {!props.hideMembers && (
-        <div className="border-t pt-6">
-          <EventMembers eventId={event.id} />
-        </div>
-      )}
     </div>
   );
 } 

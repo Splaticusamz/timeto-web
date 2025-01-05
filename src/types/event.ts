@@ -4,6 +4,8 @@ export type EventVisibility = 'public' | 'organization' | 'invite-only';
 export type EventStatus = 'draft' | 'published' | 'cancelled';
 export type LocationType = 'organization' | 'fixed' | 'virtual' | 'hybrid';
 export type EventSource = 'events' | 'publicEvents';
+export type RecurrenceType = 'weekly' | 'yearly';
+export type WeekDay = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
 
 export interface EventLocation {
   type: LocationType;

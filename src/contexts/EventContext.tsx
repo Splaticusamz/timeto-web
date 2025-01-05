@@ -74,30 +74,9 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
         ))
       ]);
 
-      // Debug the first event's data
-      if (privateEvents.docs.length > 0) {
-        const sampleData = privateEvents.docs[0].data();
-        console.log('Sample event data:', {
-          start: sampleData.start,
-          startType: typeof sampleData.start,
-          startProps: Object.keys(sampleData.start || {}),
-          end: sampleData.end,
-          endType: typeof sampleData.end,
-          endProps: Object.keys(sampleData.end || {})
-        });
-      }
-
       const loadedEvents: Event[] = [
         ...privateEvents.docs.map(doc => {
           const data = doc.data();
-          // Debug each event's start date
-          console.log(`Event ${doc.id} start:`, {
-            raw: data.start,
-            type: typeof data.start,
-            isTimestamp: data.start instanceof Timestamp,
-            hasSeconds: typeof data.start === 'object' && 'seconds' in data.start
-          });
-
           return {
             id: doc.id,
             source: 'events' as const,
@@ -307,84 +286,40 @@ export function EventProvider({ children }: { children: React.ReactNode }) {
     }
   }, [currentUser, currentOrganization]);
 
-  const updateEvent = useCallback(async (id: string, data: UpdateEventData): Promise<Event> => {
-    console.log('EventContext updateEvent called with:', { id, data });
+  const updateEvent = useCallback(async (eventId: string, data: Partial<Event>): Promise<Event> => {
+    console.log('EventContext updateEvent called with:', { eventId, data });
     
-    if (!currentUser || !currentOrganization) {
-      throw new Error('No user logged in or no organization selected');
-    }
-
     try {
-      const [privateDoc, publicDoc] = await Promise.all([
-        getDoc(doc(db, 'events', id)),
-        getDoc(doc(db, 'publicEvents', id))
-      ]);
-
-      let eventDoc = privateDoc.exists() ? privateDoc : publicDoc;
-      let currentCollection = privateDoc.exists() ? 'events' : 'publicEvents';
+      const eventRef = doc(db, 'events', eventId);
+      const eventDoc = await getDoc(eventRef);
       
       if (!eventDoc.exists()) {
         throw new Error('Event not found');
       }
 
-      const currentData = eventDoc.data();
-      const now = Timestamp.now();
-      
-      // Prepare the update data with special handling for notification settings
-      const updatedData = {
-        ...data,
-        updatedAt: now,
-        organizationId: currentOrganization.id,
-      };
-
-      // Special handling for notification settings
-      if (data.notificationSettings) {
-        updatedData.notificationSettings = {
-          enabled: Boolean(data.notificationSettings.enabled),
-          reminderTimes: Array.isArray(data.notificationSettings.reminderTimes) 
-            ? data.notificationSettings.reminderTimes 
-            : []
-        };
+      // Ensure widgets array is properly handled
+      if (data.widgets !== undefined) {
+        data.widgets = Array.isArray(data.widgets) ? data.widgets : [];
       }
 
-      console.log('Data being saved to Firestore:', updatedData);
-
-      // Update the event document
-      const eventRef = doc(db, currentCollection, id);
-      await updateDoc(eventRef, updatedData);
-
-      // Fetch the latest data after update
-      const updatedDoc = await getDoc(eventRef);
-      const updatedDocData = updatedDoc.data();
-
-      // Create the updated event object with proper handling of all fields
-      const updatedEvent = {
-        ...currentData,
-        ...updatedDocData,
-        id,
-        organizationId: currentOrganization.id,
-        source: currentCollection as EventSource,
-        updatedAt: now.toDate(),
-        start: updatedDocData.start ? convertTimestamp(updatedDocData.start) : currentData.start,
-        end: updatedDocData.end ? convertTimestamp(updatedDocData.end) : currentData.end,
-        createdAt: convertTimestamp(currentData.createdAt),
-        notificationSettings: updatedDocData.notificationSettings ? {
-          enabled: Boolean(updatedDocData.notificationSettings.enabled),
-          reminderTimes: Array.isArray(updatedDocData.notificationSettings.reminderTimes)
-            ? updatedDocData.notificationSettings.reminderTimes
-            : []
-        } : null
+      const updatedData = {
+        ...data,
+        updatedAt: serverTimestamp(),
+        organizationId: currentOrganization?.id
       };
 
-      // Update local state
-      setEvents(prev => prev.map(event => 
-        event.id === id ? updatedEvent : event
-      ));
+      console.log('Data being saved to Firestore:', updatedData);
+      await updateDoc(eventRef, updatedData);
 
+      // Fetch the updated document
+      const updatedDoc = await getDoc(eventRef);
+      const updatedEvent = { id: eventId, ...updatedDoc.data() } as Event;
+
+      console.log('Returning updated event:', updatedEvent);
       return updatedEvent;
-    } catch (err) {
-      console.error('Update event error:', err);
-      throw new Error('Failed to update event');
+    } catch (error) {
+      console.error('Failed to update event:', error);
+      throw error;
     }
   }, [currentUser, currentOrganization]);
 

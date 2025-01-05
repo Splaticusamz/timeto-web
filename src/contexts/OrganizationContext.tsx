@@ -27,6 +27,7 @@ interface OrganizationContextType {
   assignMemberToOrganization: (userId: string, organizationId: string, role: OrgMemberRole) => Promise<void>;
   loadOrganizationMembers: (organizationId: string) => Promise<Member[]>;
   removeMemberFromOrganization: (userId: string, organizationId: string) => Promise<void>;
+  refreshOrganization: (orgId: string) => Promise<OrganizationWithEventCount | null>;
 }
 
 const OrganizationContext = createContext<OrganizationContextType | null>(null);
@@ -185,8 +186,10 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   }, [currentUser, userRoles, skipNextLoad]);
 
   const createOrganization = async (data: CreateOrganizationData): Promise<OrganizationWithEventCount> => {
-    console.log('[DEBUG] 📝 Creating organization:', {
-      hasImages: Boolean(data.logoImage)
+    console.log('[DEBUG] Starting organization creation:', {
+      data,
+      currentUser: currentUser?.uid,
+      hasUserRoles: !!userRoles
     });
 
     if (!currentUser || !userRoles) throw new Error('User must be authenticated');
@@ -209,7 +212,25 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
         },
       };
 
-      await setDoc(orgRef, newOrg);
+      console.log('[DEBUG] About to write organization:', {
+        orgId: orgRef.id,
+        data: newOrg
+      });
+
+      try {
+        await setDoc(orgRef, newOrg);
+        console.log('[DEBUG] Organization written successfully');
+      } catch (writeError) {
+        console.error('[DEBUG] Failed to write organization:', writeError);
+        throw writeError;
+      }
+
+      // Verify the write
+      const verifyDoc = await getDoc(orgRef);
+      console.log('[DEBUG] Verification check:', {
+        exists: verifyDoc.exists(),
+        data: verifyDoc.exists() ? verifyDoc.data() : null
+      });
 
       const createdOrg = {
         id: orgRef.id,
@@ -272,7 +293,6 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
   const updateOrganization = async (id: string, data: Partial<Organization>) => {
     if (!currentUser || !userRoles) throw new Error('User must be authenticated');
     
-    // Check if user can update organization
     if (!isSystemAdmin() && (!userRoles.organizations[id] || !['owner', 'admin'].includes(userRoles.organizations[id]))) {
       throw new Error('You do not have permission to update this organization');
     }
@@ -281,15 +301,29 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       setError(null);
       const orgRef = doc(db, 'organizations', id);
       const now = Timestamp.now();
-      await updateDoc(orgRef, {
-        ...data,
+
+      // Get current data first
+      const orgDoc = await getDoc(orgRef);
+      if (!orgDoc.exists()) {
+        throw new Error('Organization not found');
+      }
+
+      // Deep merge the updates
+      const currentData = orgDoc.data();
+      const updateData = {
+        ...currentData,
+        ...JSON.parse(JSON.stringify(data)), // Deep clone to avoid reference issues
         updatedAt: now,
         ...(data.name ? { nameLower: data.name.toLowerCase() } : {}),
-      });
+      };
 
+      // Update in Firestore
+      await updateDoc(orgRef, updateData);
+
+      // Update local state with properly merged data
       const updatedOrg = {
-        ...currentOrganization,
-        ...data,
+        id,
+        ...updateData,
         updatedAt: now.toDate(),
       } as Organization;
 
@@ -297,6 +331,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       setUserOrganizations((prev) =>
         prev.map((org) => (org.id === id ? updatedOrg : org))
       );
+
     } catch (err) {
       console.error('Failed to update organization:', err);
       throw new Error('Failed to update organization. Please try again.');
@@ -421,33 +456,17 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     return userRoles.organizations[currentOrganization.id] || null;
   };
 
-  const isSystemAdmin = (): boolean => {
-    const result = userRoles?.systemRole === 'system_admin' || false;
-    console.log('[DEBUG] isSystemAdmin check:', {
-      userRoles: userRoles?.systemRole,
-      result
-    });
-    return result;
-  };
+  const isSystemAdmin = useCallback(() => {
+    return currentUser?.systemRole === 'system_admin';
+  }, [currentUser]);
 
   const canCreateOrganization = (): boolean => {
     const result = isSystemAdmin() || (userRoles?.systemRole === 'user' || false);
-    console.log('[DEBUG] canCreateOrganization check:', {
-      isAdmin: isSystemAdmin(),
-      userRole: userRoles?.systemRole,
-      result
-    });
     return result;
   };
 
   const canCreateSubOrganization = (parentOrgId: string): boolean => {
     const result = isSystemAdmin() || (userRoles?.organizations[parentOrgId] && ['owner', 'admin'].includes(userRoles.organizations[parentOrgId]));
-    console.log('[DEBUG] canCreateSubOrganization check:', {
-      parentOrgId,
-      isAdmin: isSystemAdmin(),
-      userRole: userRoles?.organizations[parentOrgId],
-      result
-    });
     return result;
   };
 
@@ -478,15 +497,17 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
       const membersRef = collection(db, 'organizations', organizationId, 'members');
       const membersSnapshot = await getDocs(membersRef);
       
-      const memberPromises = membersSnapshot.docs.map(async (doc) => {
-        const userDoc = await getDoc(doc(db, 'users', doc.id));
+      const memberPromises = membersSnapshot.docs.map(async (memberDoc) => {
+        const userRef = doc(db, 'users', memberDoc.id);
+        const userDoc = await getDoc(userRef);
         const userData = userDoc.data();
         return {
-          id: doc.id,
+          id: memberDoc.id,
           firstName: userData?.firstName || '',
           lastName: userData?.lastName || '',
           email: userData?.email || '',
-          role: doc.data().role as OrgMemberRole,
+          role: memberDoc.data().role as OrgMemberRole,
+          photoUrl: userData?.profileImageUrl || '',
         };
       });
 
@@ -519,6 +540,16 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const refreshOrganization = async (orgId: string) => {
+    const orgDoc = await getDoc(doc(db, 'organizations', orgId));
+    if (orgDoc.exists()) {
+      const refreshedOrg = { id: orgDoc.id, ...orgDoc.data() } as OrganizationWithEventCount;
+      setCurrentOrganization(refreshedOrg);
+      return refreshedOrg;
+    }
+    return null;
+  };
+
   const value = {
     currentOrganization,
     userOrganizations,
@@ -536,6 +567,7 @@ export const OrganizationProvider = ({ children }: { children: ReactNode }) => {
     assignMemberToOrganization,
     loadOrganizationMembers,
     removeMemberFromOrganization,
+    refreshOrganization
   };
 
   return (

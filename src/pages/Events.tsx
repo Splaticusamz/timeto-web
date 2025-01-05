@@ -119,6 +119,10 @@ export default function Events() {
     });
   };
 
+  const handleRowClick = (eventId: string) => {
+    navigate(`/events/${eventId}`);
+  };
+
   return (
     <div className="p-4">
       <div className="sm:flex sm:items-center sm:justify-between mb-6">
@@ -263,7 +267,7 @@ export default function Events() {
                       <tr
                         key={event.id}
                         className="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-                        onClick={() => navigate(`/events/${event.id}/edit`)}
+                        onClick={() => handleRowClick(event.id)}
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">{event.title}</div>

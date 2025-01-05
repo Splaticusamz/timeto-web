@@ -15,6 +15,17 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
     ]
   },
   "emulators": {
@@ -24,13 +35,11 @@
     "firestore": {
       "port": 8080
     },
-    "hosting": {
-      "port": 5001
+    "storage": {
+      "port": 9199
     },
     "ui": {
-      "enabled": true,
-      "port": 4000
-    },
-    "singleProjectMode": true
+      "enabled": true
+    }
   }
 }

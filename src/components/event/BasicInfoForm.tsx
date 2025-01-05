@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { Switch } from '@headlessui/react';
 import { formClasses } from '../../styles/forms';
 import { useOrganization } from '../../contexts/OrganizationContext';
+import { RecurrenceSelector } from './RecurrenceSelector';
 
 // Helper function to format date for datetime-local input
 function formatDateForInput(date: Date | string | undefined): string {
@@ -110,39 +111,79 @@ export function BasicInfoForm({ data, onChange }: BasicInfoFormProps) {
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <label className={formClasses.label}>
-            Start Date & Time
-          </label>
-          <input
-            type="datetime-local"
-            value={formatDateForInput(data.startDate)}
-            onChange={(e) => {
-              const date = parseDateFromInput(e.target.value);
-              if (date) {
-                onChange({ ...data, startDate: date });
-              }
-            }}
-            className={formClasses.input}
+      <div className="flex items-center justify-between">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          Recurring Event
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            if (data.recurrence) {
+              onChange({ ...data, recurrence: undefined });
+            } else {
+              onChange({
+                ...data,
+                recurrence: {
+                  type: 'weekly',
+                  startDate: data.startDate,
+                  endDate: undefined,
+                  weekDays: []
+                }
+              });
+            }
+          }}
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+            data.recurrence ? 'bg-primary-600' : 'bg-gray-200'
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+              data.recurrence ? 'translate-x-5' : 'translate-x-0'
+            }`}
           />
-        </div>
-
-        <div>
-          <label className={formClasses.label}>
-            End Date & Time (Optional)
-          </label>
-          <input
-            type="datetime-local"
-            value={formatDateForInput(data.endDate)}
-            onChange={(e) => {
-              const date = parseDateFromInput(e.target.value);
-              onChange({ ...data, endDate: date });
-            }}
-            className={formClasses.input}
-          />
-        </div>
+        </button>
       </div>
+
+      {data.recurrence ? (
+        <RecurrenceSelector
+          value={data.recurrence}
+          onChange={(recurrence) => onChange({ ...data, recurrence })}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className={formClasses.label}>
+              Start Date & Time
+            </label>
+            <input
+              type="datetime-local"
+              value={formatDateForInput(data.startDate)}
+              onChange={(e) => {
+                const date = parseDateFromInput(e.target.value);
+                if (date) {
+                  onChange({ ...data, startDate: date });
+                }
+              }}
+              className={formClasses.input}
+            />
+          </div>
+
+          <div>
+            <label className={formClasses.label}>
+              End Date & Time (Optional)
+            </label>
+            <input
+              type="datetime-local"
+              value={formatDateForInput(data.endDate)}
+              onChange={(e) => {
+                const date = parseDateFromInput(e.target.value);
+                onChange({ ...data, endDate: date });
+              }}
+              className={formClasses.input}
+            />
+          </div>
+        </div>
+      )}
 
       <div>
         <label className={formClasses.label}>
@@ -228,115 +269,6 @@ export function BasicInfoForm({ data, onChange }: BasicInfoFormProps) {
           />
         </div>
       )}
-
-      <div className="pt-2">
-        <Switch.Group>
-          <div className="flex items-center justify-between">
-            <Switch.Label className={formClasses.label}>
-              Recurring Event
-            </Switch.Label>
-            <Switch
-              checked={showRecurrence}
-              onChange={(checked) => {
-                setShowRecurrence(checked);
-                if (!checked) {
-                  handleChange('recurrence', undefined);
-                }
-              }}
-              className={`${formClasses.switch.base} ${showRecurrence ? formClasses.switch.active : formClasses.switch.inactive}`}
-            >
-              <span className={`${formClasses.switch.dot.base} ${showRecurrence ? formClasses.switch.dot.active : formClasses.switch.dot.inactive}`} />
-            </Switch>
-          </div>
-        </Switch.Group>
-
-        {showRecurrence && (
-          <div className="mt-4 space-y-4 pl-4">
-            <div>
-              <label htmlFor="frequency" className={formClasses.label}>
-                Frequency
-              </label>
-              <select
-                id="frequency"
-                value={data.recurrence?.frequency || 'weekly'}
-                onChange={(e) => handleChange('recurrence', {
-                  frequency: e.target.value,
-                  interval: data.recurrence?.interval || 1,
-                  isOngoing: data.recurrence?.isOngoing || true,
-                })}
-                className={formClasses.select}
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="interval" className={formClasses.label}>
-                Repeat every
-              </label>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="number"
-                  id="interval"
-                  min="1"
-                  value={data.recurrence?.interval || 1}
-                  onChange={(e) => handleChange('recurrence', {
-                    ...data.recurrence,
-                    interval: parseInt(e.target.value) || 1,
-                  })}
-                  className={`${formClasses.input} w-24`}
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {data.recurrence?.frequency === 'daily' ? 'days' :
-                   data.recurrence?.frequency === 'weekly' ? 'weeks' : 'months'}
-                </span>
-              </div>
-            </div>
-
-            <div>
-              <Switch.Group>
-                <div className="flex items-center justify-between">
-                  <Switch.Label className={formClasses.label}>
-                    No end date
-                  </Switch.Label>
-                  <Switch
-                    checked={data.recurrence?.isOngoing ?? true}
-                    onChange={(checked) => handleChange('recurrence', {
-                      ...data.recurrence,
-                      isOngoing: checked,
-                      endDate: checked ? undefined : data.recurrence?.endDate,
-                    })}
-                    className={`${formClasses.switch.base} ${data.recurrence?.isOngoing ? formClasses.switch.active : formClasses.switch.inactive}`}
-                  >
-                    <span className={`${formClasses.switch.dot.base} ${data.recurrence?.isOngoing ? formClasses.switch.dot.active : formClasses.switch.dot.inactive}`} />
-                  </Switch>
-                </div>
-              </Switch.Group>
-
-              {!data.recurrence?.isOngoing && (
-                <div className="mt-4">
-                  <label htmlFor="recurrenceEnd" className={formClasses.label}>
-                    End date
-                  </label>
-                  <input
-                    type="date"
-                    id="recurrenceEnd"
-                    value={data.recurrence?.endDate ? format(data.recurrence.endDate, 'yyyy-MM-dd') : ''}
-                    min={format(data.startDate, 'yyyy-MM-dd')}
-                    onChange={(e) => handleChange('recurrence', {
-                      ...data.recurrence,
-                      endDate: e.target.value ? new Date(e.target.value) : undefined,
-                    })}
-                    className={formClasses.input}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
 
       <div>
         <label htmlFor="visibility" className={formClasses.label}>

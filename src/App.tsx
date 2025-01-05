@@ -4,6 +4,7 @@ import { Layout } from './components/layout/Layout';
 import { OrganizationProvider } from './contexts/OrganizationContext';
 import { EventProvider } from './contexts/EventContext';
 import { MemberProvider } from './contexts/MemberContext';
+import { Members } from './pages/members/Members';
 
 export default function App() {
   const { currentUser } = useAuth();

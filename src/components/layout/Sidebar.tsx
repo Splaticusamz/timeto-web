@@ -21,6 +21,7 @@ export function Sidebar({ show, onClose }: SidebarProps) {
   const navigation = [
     { name: 'Events', href: '/events' },
     { name: 'Organizations', href: '/organizations' },
+    { name: 'Members', href: '/members' },
   ];
 
   const handleLogout = async () => {

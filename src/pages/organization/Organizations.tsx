@@ -1,16 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useOrganization } from '../../contexts/OrganizationContext';
-import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, getDocs, orderBy, startAfter, limit, QueryDocumentSnapshot, DocumentData, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../config/firebase';
-import { functions } from '../../config/firebase';
-import { httpsCallable } from 'firebase/functions';
 import { mockStorage } from '../../services/mockStorage';
 import { UserIcon, UsersIcon, MagnifyingGlassIcon, PlusIcon, CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import debounce from 'lodash/debounce';
 import { Dialog, Transition } from '@headlessui/react';
 import { CreateOrganizationData, OrganizationType, LocationType, Location } from '../../types/organization';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface OrganizationEventCounts {
   [key: string]: {
@@ -70,28 +68,12 @@ function CreateOrganizationModal({ isOpen, onClose, onSuccess }: CreateOrganizat
 
       setIsCheckingName(true);
       try {
-        console.log('Checking name availability for:', name);
-        
-        // Query all organizations directly
-        const organizationsRef = collection(db, 'organizations');
-        const snapshot = await getDocs(organizationsRef);
-        
-        console.log('Found organizations:', snapshot.docs.map(doc => ({
-          id: doc.id,
-          name: doc.data().name
-        })));
-
-        // Check for case-insensitive matches
-        const matches = snapshot.docs.filter(doc => 
-          doc.data().name.toLowerCase() === name.toLowerCase()
+        const nameQuery = query(
+          collection(db, 'organizations'),
+          where('nameLower', '==', name.toLowerCase())
         );
-        
-        console.log('Matching organizations:', matches.map(doc => ({
-          id: doc.id,
-          name: doc.data().name
-        })));
-
-        setIsNameAvailable(matches.length === 0);
+        const snapshot = await getDocs(nameQuery);
+        setIsNameAvailable(snapshot.empty);
       } catch (err) {
         console.error('Error checking name availability:', err);
         setIsNameAvailable(null);
@@ -144,16 +126,8 @@ function CreateOrganizationModal({ isOpen, onClose, onSuccess }: CreateOrganizat
         throw new Error('Address is required for fixed location');
       }
 
-      // Double-check name availability
-      const organizationsRef = collection(db, 'organizations');
-      const snapshot = await getDocs(organizationsRef);
-      
-      // Check for case-insensitive matches
-      const matches = snapshot.docs.filter(doc => 
-        doc.data().name.toLowerCase() === formData.name.toLowerCase()
-      );
-      
-      if (matches.length > 0) {
+      // Validate name availability
+      if (!isNameAvailable) {
         throw new Error('Organization name is not available');
       }
 
@@ -172,16 +146,17 @@ function CreateOrganizationModal({ isOpen, onClose, onSuccess }: CreateOrganizat
       }
 
       // Format the data to match the expected structure
-      const organizationData: CreateOrganizationData = {
+      const organizationData = {
         name: formData.name,
         description: formData.description,
         type: formData.type,
-        location: JSON.stringify(formData.location), // Convert location object to string
+        location: formData.location,
         contactInfo: formData.contactInfo,
         settings: formData.settings,
         logoImage: imageUrl,
         previewImage: imageUrl,
-        fullImage: imageUrl
+        fullImage: imageUrl,
+        photoUrl: imageUrl
       };
 
       // Create organization and get the result
@@ -380,7 +355,7 @@ function CreateOrganizationModal({ isOpen, onClose, onSuccess }: CreateOrganizat
                         </div>
                         <div>
                           <label htmlFor="type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Organization Type *
+                            Organization Type
                           </label>
                           <select
                             id="type"
@@ -592,21 +567,23 @@ function CreateOrganizationModal({ isOpen, onClose, onSuccess }: CreateOrganizat
 }
 
 export function Organizations() {
-  const { currentOrganization, switchOrganization, userRoles } = useOrganization();
+  const { currentOrganization, switchOrganization } = useOrganization();
   const { currentUser } = useAuth();
   const [organizationEventCounts, setOrganizationEventCounts] = useState<OrganizationEventCounts>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [organizations, setOrganizations] = useState<any[]>([]);
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hideZeroPrivate, setHideZeroPrivate] = useState(false);
   const [hideZeroPublic, setHideZeroPublic] = useState(false);
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const ITEMS_PER_PAGE = 10;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'createdAt' | 'updatedAt'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [toast, setToast] = useState<{ message: string; orgName: string } | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const ITEMS_PER_PAGE = 10;
 
   const handleToastClick = (orgName: string) => {
     setSearchTerm(orgName);
@@ -627,129 +604,144 @@ export function Organizations() {
     );
   };
 
-  const loadOrganizations = useCallback(async (searchQuery?: string) => {
-    if (!currentUser || !userRoles) return;
-
+  const loadOrganizations = async (searchQuery: string = '', lastDoc: QueryDocumentSnapshot<DocumentData> | null = null) => {
     try {
-      setIsLoading(true);
-
-      let baseQuery;
-      
-      // If user is system_admin, show all organizations
-      if (userRoles.systemRole === 'system_admin') {
-        baseQuery = query(
-          collection(db, 'organizations'),
-          orderBy(sortBy, sortOrder)
-        );
-      } else {
-        // For regular users, only show organizations they're a member of
-        const userOrgIds = Object.keys(userRoles.organizations);
-        if (userOrgIds.length === 0) {
-          setOrganizations([]);
-          setTotalPages(1);
-          return;
-        }
-
-        baseQuery = query(
-          collection(db, 'organizations'),
-          where('__name__', 'in', userOrgIds),
-          orderBy(sortBy, sortOrder)
-        );
+      if (!currentUser) {
+        return;
       }
 
-      // Get all organizations
+      if (!searchQuery && lastDoc) {
+        setIsLoadingMore(true);
+      } else {
+        setIsLoading(true);
+      }
+
+      let baseQuery;
+      const userRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userRef);
+      const isAdmin = userDoc.data()?.systemRole === 'system_admin';
+      
+      if (searchQuery) {
+        baseQuery = query(
+          collection(db, 'organizations'),
+          ...(isAdmin ? [] : [where(`members.${currentUser.uid}`, '!=', null)]),
+          orderBy('name'),
+          where('name', '>=', searchQuery),
+          where('name', '<=', searchQuery + '\uf8ff'),
+          limit(ITEMS_PER_PAGE)
+        );
+      } else {
+        baseQuery = query(
+          collection(db, 'organizations'),
+          ...(isAdmin ? [] : [where(`members.${currentUser.uid}`, '!=', null)]),
+          orderBy(sortBy, sortOrder),
+          limit(ITEMS_PER_PAGE)
+        );
+
+        if (lastDoc) {
+          baseQuery = query(baseQuery, startAfter(lastDoc));
+        }
+      }
+
       const snapshot = await getDocs(baseQuery);
-      let allOrgs = snapshot.docs.map(doc => ({
+      const fetchedOrgs = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
-      })) as Array<{ id: string; name: string; [key: string]: any }>;
+        ...doc.data(),
+      }));
 
-      // Store all organizations
-      setOrganizations(allOrgs);
+      // Update pagination state
+      setHasMore(snapshot.docs.length === ITEMS_PER_PAGE);
+      setLastVisible(snapshot.docs[snapshot.docs.length - 1] || null);
 
-      // Load event counts for all organizations
-      const eventCounts: OrganizationEventCounts = {};
-      await Promise.all(
-        allOrgs.map(async (org) => {
-          try {
-            const [privateEvents, publicEvents] = await Promise.all([
-              getDocs(query(
-                collection(db, 'events'),
-                where('owner', '==', org.id)
-              )),
-              getDocs(query(
-                collection(db, 'publicEvents'),
-                where('owner', '==', org.id)
-              ))
-            ]);
+      // Filter out organizations that we already have event counts for
+      const newOrgs = fetchedOrgs.filter(org => !organizationEventCounts[org.id]);
 
-            eventCounts[org.id] = {
-              private: privateEvents.size,
-              public: publicEvents.size
-            };
-          } catch (err) {
-            console.error(`Failed to load event counts for organization ${org.id}:`, err);
-            eventCounts[org.id] = { private: 0, public: 0 };
-          }
-        })
-      );
+      // Load event counts only for new organizations
+      if (newOrgs.length > 0) {
+        const counts: OrganizationEventCounts = {};
+        await Promise.all(
+          newOrgs.map(async (org) => {
+            // Query both private and public events in parallel
+            const [eventsRef, publicEventsRef] = [
+              collection(db, 'events'),
+              collection(db, 'publicEvents')
+            ];
 
-      setOrganizationEventCounts(eventCounts);
+            const [privateEventsQuery, publicEventsQuery] = [
+              query(eventsRef, where('owner', '==', org.id)),
+              query(publicEventsRef, where('owner', '==', org.id))
+            ];
+
+            try {
+              const [privateEvents, publicEvents] = await Promise.all([
+                getDocs(privateEventsQuery),
+                getDocs(publicEventsQuery)
+              ]);
+
+              counts[org.id] = {
+                private: privateEvents.size,
+                public: publicEvents.size
+              };
+            } catch (error) {
+              console.error(`Error loading events for org ${org.id}:`, error);
+              counts[org.id] = {
+                private: 0,
+                public: 0
+              };
+            }
+          })
+        );
+
+        setOrganizationEventCounts(prev => ({ ...prev, ...counts }));
+      }
+
+      // Update organizations state
+      if (!searchQuery && lastDoc) {
+        setOrganizations(prev => [...prev, ...fetchedOrgs]);
+      } else {
+        setOrganizations(fetchedOrgs);
+      }
     } catch (err) {
       console.error('Failed to load organizations:', err);
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
-  }, [currentUser, userRoles, sortBy, sortOrder]);
-
-  // Get filtered organizations
-  const getFilteredOrganizations = useCallback(() => {
-    let filtered = [...organizations];
-
-    // Apply search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(org => 
-        org.name.toLowerCase().includes(searchLower)
-      );
-    }
-
-    // Apply event count filters
-    if (hideZeroPrivate || hideZeroPublic) {
-      filtered = filtered.filter(org => {
-        const counts = organizationEventCounts[org.id] || { private: 0, public: 0 };
-        if (hideZeroPrivate && counts.private === 0) return false;
-        if (hideZeroPublic && counts.public === 0) return false;
-        return true;
-      });
-    }
-
-    return filtered;
-  }, [organizations, searchTerm, hideZeroPrivate, hideZeroPublic, organizationEventCounts]);
-
-  // Update total pages when filters change
-  useEffect(() => {
-    const filtered = getFilteredOrganizations();
-    const total = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-    setTotalPages(total);
-  }, [getFilteredOrganizations]);
-
-  // Get current page organizations
-  const getCurrentPageOrganizations = useCallback(() => {
-    const filtered = getFilteredOrganizations();
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    return filtered.slice(startIndex, endIndex);
-  }, [getFilteredOrganizations, currentPage]);
-
-  // Load organizations on mount and when sort changes
-  useEffect(() => {
-    loadOrganizations();
-  }, [sortBy, sortOrder, loadOrganizations]);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
   };
+
+  const debouncedSearch = useCallback(
+    debounce((query: string) => {
+      setLastVisible(null);
+      setHasMore(true);
+      // Capitalize first letter to match the format in the database
+      const formattedQuery = query ? query.charAt(0).toUpperCase() + query.slice(1) : '';
+      loadOrganizations(formattedQuery);
+    }, 300),
+    []
+  );
+
+  useEffect(() => {
+    debouncedSearch(searchTerm);
+    return () => debouncedSearch.cancel();
+  }, [searchTerm, debouncedSearch]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !isLoading && !isLoadingMore) {
+          loadOrganizations(searchTerm, lastVisible);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, isLoading, isLoadingMore, lastVisible, searchTerm]);
 
   const handleOrganizationClick = async (orgId: string) => {
     try {
@@ -757,87 +749,6 @@ export function Organizations() {
     } catch (err) {
       console.error('Failed to switch organization:', err);
     }
-  };
-
-  const Pagination = () => {
-    if (totalPages <= 1) return null;
-
-    const MAX_VISIBLE_PAGES = 5;
-    let pages: (number | string)[] = [];
-
-    if (totalPages <= MAX_VISIBLE_PAGES) {
-      // Show all pages if total pages is less than or equal to max visible pages
-      pages = Array.from({ length: totalPages }, (_, i) => i + 1);
-    } else {
-      // Always show first and last page
-      pages = [1];
-
-      // Calculate middle pages
-      let startPage = Math.max(2, currentPage - 1);
-      let endPage = Math.min(totalPages - 1, currentPage + 1);
-
-      // Adjust if we're near the start or end
-      if (currentPage <= 3) {
-        endPage = 4;
-      } else if (currentPage >= totalPages - 2) {
-        startPage = totalPages - 3;
-      }
-
-      // Add ellipsis if needed
-      if (startPage > 2) {
-        pages.push('...');
-      }
-
-      // Add middle pages
-      for (let i = startPage; i <= endPage; i++) {
-        pages.push(i);
-      }
-
-      // Add ellipsis if needed
-      if (endPage < totalPages - 1) {
-        pages.push('...');
-      }
-
-      // Add last page
-      pages.push(totalPages);
-    }
-
-    return (
-      <div className="flex justify-center items-center space-x-2 mt-6">
-        <button
-          onClick={() => handlePageChange(1)}
-          disabled={currentPage === 1}
-          className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          First
-        </button>
-        {pages.map((page, index) => (
-          <React.Fragment key={index}>
-            {typeof page === 'string' ? (
-              <span className="px-3 py-2 text-gray-500 dark:text-gray-400">{page}</span>
-            ) : (
-              <button
-                onClick={() => handlePageChange(page)}
-                className={`px-3 py-2 rounded-md text-sm font-medium ${
-                  currentPage === page
-                    ? 'bg-primary-600 text-white'
-                    : 'text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                }`}
-              >
-                {page}
-              </button>
-            )}
-          </React.Fragment>
-        ))}
-        <button
-          onClick={() => handlePageChange(totalPages)}
-          disabled={currentPage === totalPages}
-          className="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Last
-        </button>
-      </div>
-    );
   };
 
   const EventCountPill = ({ type, count }: { type: 'private' | 'public', count: number }) => {
@@ -866,6 +777,21 @@ export function Organizations() {
     );
   };
 
+  // Filter organizations based on event counts
+  const filteredOrganizations = organizations.filter(org => {
+    const counts = organizationEventCounts[org.id] || { private: 0, public: 0 };
+    if (hideZeroPrivate && counts.private === 0) return false;
+    if (hideZeroPublic && counts.public === 0) return false;
+    return true;
+  });
+
+  // Reset pagination when sort changes
+  useEffect(() => {
+    setLastVisible(null);
+    setHasMore(true);
+    loadOrganizations();
+  }, [sortBy, sortOrder]);
+
   return (
     <>
       <CreateOrganizationModal
@@ -879,153 +805,138 @@ export function Organizations() {
         }}
       />
       <Toast />
+      <button
+        onClick={() => setIsCreateModalOpen(true)}
+        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+      >
+        <PlusIcon className="h-5 w-5 mr-2" />
+        New Organization
+      </button>
       <div className="max-w-6xl mx-auto py-8 px-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Organizations</h1>
           
-          {organizations.length > 0 && (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 w-full sm:w-auto">
-              {/* Search and Sort Controls */}
-              <div className="flex items-center space-x-4 w-full sm:w-auto">
-                {/* Search input */}
-                <div className="relative flex-1 sm:flex-none sm:w-64">
-                  <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search organizations..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setCurrentPage(1); // Reset to first page when searching
-                    }}
-                    className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
-                </div>
-
-                {/* Sort Controls */}
-                <div className="flex items-center space-x-2">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'name' | 'createdAt' | 'updatedAt')}
-                    className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent py-2 pl-3 pr-8 text-sm"
-                  >
-                    <option value="name">Name</option>
-                    <option value="createdAt">Created Date</option>
-                    <option value="updatedAt">Updated Date</option>
-                  </select>
-
-                  <button
-                    onClick={() => setSortOrder(current => current === 'asc' ? 'desc' : 'asc')}
-                    className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600"
-                  >
-                    {sortOrder === 'asc' ? '↑' : '↓'}
-                  </button>
-                </div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 w-full sm:w-auto">
+            {/* Search and Sort Controls */}
+            <div className="flex items-center space-x-4 w-full sm:w-auto">
+              {/* Search input */}
+              <div className="relative flex-1 sm:flex-none sm:w-64">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search organizations..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
               </div>
 
-              {/* Legend and Filters */}
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-4">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <span className="inline-flex items-center px-3 py-1 text-sm rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
-                      <UserIcon className="w-4 h-4 mr-1" />
-                      Private
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={hideZeroPrivate}
-                      onChange={(e) => setHideZeroPrivate(e.target.checked)}
-                      className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50 dark:border-gray-600 dark:bg-gray-700"
-                    />
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Hide 0</span>
-                  </label>
+              {/* Sort Controls */}
+              <div className="flex items-center space-x-2">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'name' | 'createdAt' | 'updatedAt')}
+                  className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent py-2 pl-3 pr-8 text-sm"
+                >
+                  <option value="name">Name</option>
+                  <option value="createdAt">Created Date</option>
+                  <option value="updatedAt">Updated Date</option>
+                </select>
 
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <span className="inline-flex items-center px-3 py-1 text-sm rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                      <UsersIcon className="w-4 h-4 mr-1" />
-                      Public
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={hideZeroPublic}
-                      onChange={(e) => setHideZeroPublic(e.target.checked)}
-                      className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50 dark:border-gray-600 dark:bg-gray-700"
-                    />
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Hide 0</span>
-                  </label>
-                </div>
+                <button
+                  onClick={() => setSortOrder(current => current === 'asc' ? 'desc' : 'asc')}
+                  className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </button>
               </div>
             </div>
-          )}
+
+            {/* Legend and Filters */}
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <span className="inline-flex items-center px-3 py-1 text-sm rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300">
+                    <UserIcon className="w-4 h-4 mr-1" />
+                    Private
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={hideZeroPrivate}
+                    onChange={(e) => setHideZeroPrivate(e.target.checked)}
+                    className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50 dark:border-gray-600 dark:bg-gray-700"
+                  />
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Hide 0</span>
+                </label>
+
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <span className="inline-flex items-center px-3 py-1 text-sm rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
+                    <UsersIcon className="w-4 h-4 mr-1" />
+                    Public
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={hideZeroPublic}
+                    onChange={(e) => setHideZeroPublic(e.target.checked)}
+                    className="rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-300 focus:ring focus:ring-primary-200 focus:ring-opacity-50 dark:border-gray-600 dark:bg-gray-700"
+                  />
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Hide 0</span>
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="mt-6 space-y-4">
-          {!isLoading && organizations.length === 0 ? (
-            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                You don't have any organizations yet
-              </h3>
-              <p className="text-gray-500 dark:text-gray-400 mb-6">
-                Create your first organization to get started
-              </p>
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                <PlusIcon className="h-5 w-5 mr-2" />
-                Create Organization
-              </button>
+          {filteredOrganizations.map((org, index) => (
+            <div
+              key={`org-${org.id}-${index}`}
+              onClick={() => handleOrganizationClick(org.id)}
+              className={`
+                bg-white dark:bg-gray-800 shadow rounded-lg p-6 cursor-pointer
+                transition-all duration-200 flex justify-between items-center
+                ${org.id === currentOrganization?.id 
+                  ? 'ring-2 ring-primary-500 dark:ring-primary-400' 
+                  : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                }
+              `}
+            >
+              <h2 className={`text-xl font-medium ${
+                org.id === currentOrganization?.id
+                  ? 'text-primary-600 dark:text-primary-400'
+                  : 'text-gray-900 dark:text-white'
+              }`}>
+                {org.name}
+              </h2>
+              <div className="flex items-center space-x-3">
+                <EventCountPill 
+                  type="private" 
+                  count={organizationEventCounts[org.id]?.private || 0} 
+                />
+                <EventCountPill 
+                  type="public" 
+                  count={organizationEventCounts[org.id]?.public || 0} 
+                />
+              </div>
             </div>
-          ) : (
-            <>
-              {organizations.length > 0 && (
-                <button
-                  onClick={() => setIsCreateModalOpen(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 mb-4"
-                >
-                  <PlusIcon className="h-5 w-5 mr-2" />
-                  New Organization
-                </button>
-              )}
-              {getCurrentPageOrganizations().map(org => (
-                <div
-                  key={`org-list-${org.id}`}
-                  onClick={() => handleOrganizationClick(org.id)}
-                  className={`
-                    bg-white dark:bg-gray-800 shadow rounded-lg p-6 cursor-pointer
-                    transition-all duration-200 flex justify-between items-center
-                    ${org.id === currentOrganization?.id 
-                      ? 'ring-2 ring-primary-500 dark:ring-primary-400' 
-                      : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }
-                  `}
-                >
-                  <h2 className={`text-xl font-medium ${
-                    org.id === currentOrganization?.id
-                      ? 'text-primary-600 dark:text-primary-400'
-                      : 'text-gray-900 dark:text-white'
-                  }`}>
-                    {org.name}
-                  </h2>
-                  <div className="flex items-center space-x-3">
-                    <EventCountPill 
-                      type="private" 
-                      count={organizationEventCounts[org.id]?.private || 0} 
-                    />
-                    <EventCountPill 
-                      type="public" 
-                      count={organizationEventCounts[org.id]?.public || 0} 
-                    />
-                  </div>
-                </div>
-              ))}
-              <Pagination />
-            </>
-          )}
+          ))}
 
-          {isLoading && (
+          {/* Infinite scroll observer target */}
+          <div 
+            ref={observerTarget} 
+            className="h-4"
+            aria-hidden="true"
+          />
+
+          {(isLoading || isLoadingMore) && (
             <div className="flex justify-center py-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+            </div>
+          )}
+
+          {!isLoading && organizations.length === 0 && (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              No organizations found
             </div>
           )}
         </div>

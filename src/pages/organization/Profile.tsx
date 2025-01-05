@@ -6,11 +6,22 @@ import { db } from '../../config/firebase';
 import { useNavigate } from 'react-router-dom';
 
 export function Profile() {
-  const { currentOrganization, updateOrganization, deleteOrganization } = useOrganization();
+  const { currentOrganization, updateOrganization, deleteOrganization, refreshOrganization } = useOrganization();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(currentOrganization || {});
+  const [formData, setFormData] = useState(() => ({
+    ...currentOrganization,
+    contactInfo: {
+      ...currentOrganization?.contactInfo
+    },
+    location: {
+      ...currentOrganization?.location
+    },
+    settings: {
+      ...currentOrganization?.settings
+    }
+  }));
   const [loading, setLoading] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -59,26 +70,32 @@ export function Profile() {
         value = value[key];
       }
 
-      // Create an update object with just the changed field
-      const updateObj = { ...currentOrganization };
+      // Create update object with just the changed field
+      const updateObj = {};
       let current = updateObj;
       for (let i = 0; i < keys.length - 1; i++) {
+        current[keys[i]] = {};
         current = current[keys[i]];
       }
       current[keys[keys.length - 1]] = value;
 
+      // If updating name, also update nameLower
+      if (path === 'name') {
+        updateObj.nameLower = value.toLowerCase();
+      }
+
+      // Update database
       await updateOrganization(currentOrganization.id, updateObj);
       
-      // Update the form data to match the current organization data
-      setFormData(prev => {
-        const newData = { ...prev };
-        let current = newData;
-        for (let i = 0; i < keys.length - 1; i++) {
-          current = current[keys[i]];
-        }
-        current[keys[keys.length - 1]] = value;
-        return newData;
-      });
+      // Refresh data from database
+      const refreshedOrg = await refreshOrganization(currentOrganization.id);
+      if (refreshedOrg) {
+        setFormData(refreshedOrg);
+      }
+
+      // Show success state briefly
+      await new Promise(resolve => setTimeout(resolve, 500));
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update field');
     } finally {
@@ -220,6 +237,22 @@ export function Profile() {
     }
   };
 
+  const handleEditClick = () => {
+    setFormData({
+      ...currentOrganization,
+      contactInfo: {
+        ...currentOrganization?.contactInfo
+      },
+      location: {
+        ...currentOrganization?.location
+      },
+      settings: {
+        ...currentOrganization?.settings
+      }
+    });
+    setIsEditing(true);
+  };
+
   return (
     <div className="max-w-7xl mx-auto py-8 px-4">
       <div className="flex justify-between items-center mb-6">
@@ -235,7 +268,7 @@ export function Profile() {
                 Delete
               </button>
               <button
-                onClick={() => setIsEditing(true)}
+                onClick={handleEditClick}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 <PencilIcon className="h-4 w-4 mr-2" />

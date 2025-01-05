@@ -1,49 +1,61 @@
 import admin from 'firebase-admin';
 
-// Set emulator host
 process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
-
-const app = admin.initializeApp({
-  projectId: 'test-project-id'
-});
-
+const app = admin.initializeApp({ projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'timeto-69867' });
 const db = admin.firestore();
 
-function formatTimestamp(timestamp) {
-  if (!timestamp) return 'N/A';
-  return new Date(timestamp._seconds * 1000).toLocaleString();
-}
+let lastCreatedOrgId = null;
+const startTime = admin.firestore.Timestamp.now().toMillis();
 
 async function testDatabaseOperations() {
   try {
-    console.log('[DEBUG] Testing database operations...');
-    const YOUR_USER_ID = 'K8fRXxDdVp1vQpuxWPXeuDdulv0e';
+    console.log('\n🕒 Script started at:', new Date(startTime).toISOString());
 
-    // Find organizations you own
-    console.log('\n[DEBUG] Looking for organizations you own...');
-    const ownedOrgsSnapshot = await db.collection('organizations')
-      .where('ownerId', '==', YOUR_USER_ID)
-      .orderBy('createdAt', 'desc')
-      .get();
-    
-    console.log(`[DEBUG] Found ${ownedOrgsSnapshot.size} organizations owned by you:`);
-    ownedOrgsSnapshot.forEach(doc => {
-      const data = doc.data();
-      console.log('\nOrganization:', {
-        id: doc.id,
-        name: data.name,
-        description: data.description,
-        createdAt: formatTimestamp(data.createdAt),
-        type: data.type
+    // Watch organizations
+    db.collection('organizations')
+      .onSnapshot((snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            lastCreatedOrgId = change.doc.id;
+            console.log('\n🏢 New organization added:', {
+              id: change.doc.id,
+              owner: data.ownerId,
+              name: data.name
+            });
+          } else if (change.type === 'modified') {
+            console.log('\n📝 Organization updated:', change.doc.id);
+          } else if (change.type === 'removed') {
+            console.log('\n🗑️ Organization deleted:', change.doc.id);
+          }
+        });
       });
-    });
 
+    // Watch private events
+    db.collection('events')
+      .onSnapshot((snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === 'added') {
+            const data = change.doc.data();
+            console.log('\n📅 New private event added:', {
+              id: change.doc.id,
+              orgId: data.organizationId,
+              shouldBeOrgId: lastCreatedOrgId,
+              title: data.title
+            });
+          } else if (change.type === 'modified') {
+            console.log('\n📝 Private event updated:', change.doc.id);
+          } else if (change.type === 'removed') {
+            console.log('\n🗑️ Private event deleted:', change.doc.id);
+          }
+        });
+      });
+
+    console.log('\n👀 Watching for all changes...');
+    console.log('Press Ctrl+C to stop');
   } catch (error) {
-    console.error('[DEBUG] Error during test:', error);
+    console.error('Error:', error.message);
   }
 }
 
-testDatabaseOperations().then(() => {
-  console.log('\n[DEBUG] Test completed');
-  process.exit(0);
-});
+testDatabaseOperations();

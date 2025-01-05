@@ -28,7 +28,12 @@ interface BasicInfoFormData {
   timezone: string;
   location: EventLocation;
   visibility: EventVisibility;
-  recurrence?: RecurrenceRule;
+  recurrence?: {
+    type?: 'weekly' | 'yearly';
+    startDate?: Date;
+    endDate?: Date;
+    weekDays?: WeekDay[];
+  };
 }
 
 interface WidgetFormData {
@@ -413,9 +418,12 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
         timezone: basicInfo.timezone,
         location: basicInfo.location,
         visibility: basicInfo.visibility,
-        recurrence: basicInfo.recurrence ? {
-          ...basicInfo.recurrence,
-          endDate: basicInfo.recurrence.endDate ? new Date(basicInfo.recurrence.endDate) : undefined
+        recurrence: basicInfo.recurrence?.type ? {
+          frequency: basicInfo.recurrence.type === 'weekly' ? 'weekly' : 'yearly',
+          interval: 1,
+          startDate: basicInfo.recurrence.startDate,
+          endDate: basicInfo.recurrence.endDate,
+          weekDays: basicInfo.recurrence.weekDays,
         } : undefined,
         widgets: widgetConfig.widgets
           .filter(w => w.isEnabled)
@@ -648,21 +656,23 @@ export function EventWizard({ event, onSave, mode = 'create' }: EventWizardProps
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={handleNext}
-                className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
-              >
-                Next
-              </button>
+            <div className="space-y-4">
+              <div className="mt-6 flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0">
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         )}
