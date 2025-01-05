@@ -1,2 +1,0 @@
-firebase emulators:start --import=./local-backup
-VITE_USE_EMULATOR=true npm run dev

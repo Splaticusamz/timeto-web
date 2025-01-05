@@ -44,14 +44,33 @@ dist-ssr
 *.rules.dev
 
 # Temporary files
-
 layout-snapshot.md
-
-spec.txt
-service-account-backup-NO-TOUCHING.json
+scripts/
+.cursorignore
+firebase-export-1735588513434KBajgx/
 
 # Firebase emulator data
-# local-backup/
-# firestore-backup.json
-# service-account*.json
-# server-init.txt
+local-backup/
+firestore-backup.json
+service-account*.json
+server-init.txt
+
+# Backups and exports
+backup_*/
+emulator-backups/
+auth_export.json
+firebase-export-*/
+
+# Empty/Temporary files
+Get-Process
+assistant_snippet_*.txt
+
+# Duplicate configs
+eslint.config.js
+
+# Unnecessary src files
+src/routes.tsx
+src/vite-env.d.ts
+src/mocks/
+src/pages/Organizations.tsx
+src/pages/Events.tsx
